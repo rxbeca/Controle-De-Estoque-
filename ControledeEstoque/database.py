@@ -12,7 +12,7 @@ def criar_banco():
         )
     """)
 
-    # 2. Tabela Principal dos Itens da CENDE (com todas as informações detalhadas)
+    # 2. Tabela Principal dos Itens da CENDE
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS itens_cende (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,6 +27,7 @@ def criar_banco():
             FOREIGN KEY (categoria_id) REFERENCES categorias(id)
         )
     """)
+
     # 3. Tabela de Armários (locais específicos)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS armarios (
@@ -70,6 +71,14 @@ def criar_banco():
 
     # --- INSERÇÃO DE DADOS PADRÃO ---
 
+    # Cadastra um item inicial se a tabela estiver vazia
+    cursor.execute("SELECT COUNT(*) FROM itens_cende")
+    if cursor.fetchone()[0] == 0:
+        itens_iniciais = [
+            ("Item de bens da CENDE",)
+        ]
+        cursor.executemany("INSERT INTO itens_cende (nome) VALUES (?)", itens_iniciais)
+
     # Cadastra os armários se a tabela estiver vazia
     cursor.execute("SELECT COUNT(*) FROM armarios")
     if cursor.fetchone()[0] == 0:
@@ -91,7 +100,8 @@ def criar_banco():
             ("Saída / Empréstimo", "SAIDA"),
             ("Devolução", "ENTRADA"),
             ("Ajuste de Inventário (Positivo)", "ENTRADA"),
-            ("Ajuste de Inventário (Negativo)", "SAIDA")
+            ("Ajuste de Inventário (Negativo)", "SAIDA"),
+            ("Saída para Manutenção", "SAIDA"),
         ])
 
     conexao.commit()
@@ -107,7 +117,6 @@ def adicionar_item_ao_armario(nome_armario, nome_item):
     cursor = conexao.cursor()
 
     try:
-        # Busca o ID do armário pelo nome (ex: 'Armário 1')
         cursor.execute("SELECT id FROM armarios WHERE nome = ?", (nome_armario,))
         resultado = cursor.fetchone()
 
@@ -116,7 +125,6 @@ def adicionar_item_ao_armario(nome_armario, nome_item):
 
         armario_id = resultado[0]
 
-        # Insere o nome do item associado ao armário
         cursor.execute("""
             INSERT INTO itens_armario (armario_id, nome_item)
             VALUES (?, ?)
@@ -150,10 +158,6 @@ def listar_itens_do_armario(nome_armario):
     return [item[0] for item in itens]
 
 
-if __name__ == "__main__":
-    criar_banco()
-# ... (Mantenha a função criar_banco aqui) ...
-
 def registrar_movimentacao_db(item_id, tipo_movimentacao_id, quantidade, observacao=""):
     """
     Registra uma movimentação no histórico e atualiza a quantidade do item na tabela itens_cende.
@@ -162,7 +166,6 @@ def registrar_movimentacao_db(item_id, tipo_movimentacao_id, quantidade, observa
     cursor = conexao.cursor()
 
     try:
-        # 1. Buscar o tipo da movimentação (ENTRADA ou SAIDA)
         cursor.execute("SELECT tipo FROM tipos_movimentacao WHERE id = ?", (tipo_movimentacao_id,))
         resultado = cursor.fetchone()
         if not resultado:
@@ -170,13 +173,11 @@ def registrar_movimentacao_db(item_id, tipo_movimentacao_id, quantidade, observa
         
         tipo = resultado[0]
 
-        # 2. Registrar no histórico usando item_id
         cursor.execute("""
             INSERT INTO movimentacoes (item_id, tipo_movimentacao_id, quantidade, observacao)
             VALUES (?, ?, ?, ?)
         """, (item_id, tipo_movimentacao_id, quantidade, observacao))
 
-        # 3. Atualizar a tabela itens_cende
         if tipo == 'ENTRADA':
             cursor.execute("""
                 UPDATE itens_cende SET quantidade_atual = quantidade_atual + ? WHERE id = ?
@@ -193,5 +194,42 @@ def registrar_movimentacao_db(item_id, tipo_movimentacao_id, quantidade, observa
         return False, str(e)
     finally:
         conexao.close()
+
+
+def excluir_item_db(item_id):
+    """
+    Remove um item do banco de dados pelo seu ID, limpando também suas movimentações
+    e vínculos em armários para manter a integridade do banco.
+    """
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+
+    try:
+        cursor.execute("SELECT nome FROM itens_cende WHERE id = ?", (item_id,))
+        res = cursor.fetchone()
         
-    
+        if not res:
+            return False, "Item não encontrado."
+
+        nome_item = res[0]
+
+        # Remove o histórico do item
+        cursor.execute("DELETE FROM movimentacoes WHERE item_id = ?", (item_id,))
+
+        # Remove referências de armário vinculadas ao nome do item
+        cursor.execute("DELETE FROM itens_armario WHERE nome_item = ?", (nome_item,))
+
+        # Remove o item da tabela principal
+        cursor.execute("DELETE FROM itens_cende WHERE id = ?", (item_id,))
+
+        conexao.commit()
+        return True, f"Item '{nome_item}' excluído com sucesso!"
+    except Exception as e:
+        conexao.rollback()
+        return False, f"Erro ao excluir item: {e}"
+    finally:
+        conexao.close()
+
+
+if __name__ == "__main__":
+    criar_banco()
