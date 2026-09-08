@@ -7,10 +7,15 @@ from PySide6.QtWidgets import (
     QLineEdit, QSpinBox, QComboBox, QTextEdit, QTabWidget, QLabel
 )
 from PySide6.QtCore import Qt
-from database import criar_banco, registrar_movimentacao_db, adicionar_item_ao_armario
+from database import (
+    criar_banco, 
+    registrar_movimentacao_db, 
+    adicionar_item_ao_armario, 
+    excluir_item_db
+)
 
 
-# --- DIÁLOGO PARA CADASTRAR UM NOVO ITEM ---
+# --- CADASTRAR UM NOVO ITEM ---
 class DialogNovoItem(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -64,6 +69,7 @@ class DialogNovoItem(QDialog):
             self.combo_categoria.addItem(nome, cat_id)
 
         # Carregar Armários
+        self.combo_armario.addItem("Bens da CENDE", None)
         cursor.execute("SELECT id, nome FROM armarios")
         for arm_id, nome in cursor.fetchall():
             self.combo_armario.addItem(nome, arm_id)
@@ -79,6 +85,7 @@ class DialogNovoItem(QDialog):
         local = self.input_local.text().strip()
         status = self.combo_status.currentText()
         categoria_id = self.combo_categoria.currentData()
+        armario_id = self.combo_armario.currentData()
         nome_armario = self.combo_armario.currentText()
 
         if not nome:
@@ -98,8 +105,9 @@ class DialogNovoItem(QDialog):
             conexao.commit()
             conexao.close()
 
-            # Vincular o nome do item ao armário selecionado
-            adicionar_item_ao_armario(nome_armario, nome)
+            # Vincular o item somente quando um armário foi selecionado
+            if armario_id is not None:
+                adicionar_item_ao_armario(nome_armario, nome)
 
             QMessageBox.information(self, "Sucesso", "Item cadastrado com sucesso!")
             self.accept()
@@ -138,12 +146,10 @@ class DialogMovimentacao(QDialog):
         conexao = sqlite3.connect("estoque.db")
         cursor = conexao.cursor()
 
-        # CORREÇÃO: Busca da tabela itens_cende em vez de produtos
         cursor.execute("SELECT id, nome, quantidade_atual FROM itens_cende")
         for i_id, nome, qtd in cursor.fetchall():
             self.combo_item.addItem(f"{nome} (Qtd atual: {qtd})", i_id)
 
-        # Carregar Tipos de Movimentação
         cursor.execute("SELECT id, nome, tipo FROM tipos_movimentacao")
         for t_id, nome, tipo in cursor.fetchall():
             self.combo_tipo.addItem(f"[{tipo}] {nome}", t_id)
@@ -160,13 +166,14 @@ class DialogMovimentacao(QDialog):
             QMessageBox.warning(self, "Atenção", "Selecione o item e o tipo de movimentação.")
             return
 
-        # Chama a função atualizada do banco
         sucesso, msg = registrar_movimentacao_db(item_id, tipo_id, quantidade, observacao)
         if sucesso:
             QMessageBox.information(self, "Sucesso", msg)
             self.accept()
         else:
             QMessageBox.critical(self, "Erro", f"Falha na operação: {msg}")
+
+
 # --- JANELA PRINCIPAL COM ABAS ---
 class JanelaPrincipal(QMainWindow):
     def __init__(self):
@@ -192,6 +199,12 @@ class JanelaPrincipal(QMainWindow):
         self.btn_movimentacao = QPushButton("Registrar Movimentação")
         self.btn_movimentacao.clicked.connect(self.abrir_movimentacao)
         self.layout_botoes.addWidget(self.btn_movimentacao)
+
+        # Botão de Exclusão
+        self.btn_excluir_item = QPushButton("Excluir Item Selecionado")
+        self.btn_excluir_item.setStyleSheet("background-color: #d9534f; color: white; font-weight: bold;")
+        self.btn_excluir_item.clicked.connect(self.excluir_item_selecionado)
+        self.layout_botoes.addWidget(self.btn_excluir_item)
 
         self.layout_principal.addLayout(self.layout_botoes)
 
@@ -303,6 +316,33 @@ class JanelaPrincipal(QMainWindow):
         dialogo = DialogMovimentacao(self)
         if dialogo.exec():
             self.atualizar_tudo()
+
+    def excluir_item_selecionado(self):
+        linha_selecionada = self.tabela_itens.currentRow()
+
+        if linha_selecionada == -1:
+            QMessageBox.warning(self, "Atenção", "Selecione um item na tabela de itens da CENDE para excluir.")
+            return
+
+        item_id = self.tabela_itens.item(linha_selecionada, 0).text()
+        nome_item = self.tabela_itens.item(linha_selecionada, 1).text()
+
+        resposta = QMessageBox.question(
+            self,
+            "Confirmar Exclusão",
+            f"Tem certeza que deseja excluir o item '{nome_item}' (ID: {item_id})?\n\n"
+            "Isso removerá também o histórico de movimentações e referências em armários.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if resposta == QMessageBox.Yes:
+            sucesso, msg = excluir_item_db(int(item_id))
+            if sucesso:
+                QMessageBox.information(self, "Sucesso", msg)
+                self.atualizar_tudo()
+            else:
+                QMessageBox.critical(self, "Erro", msg)
 
 
 if __name__ == "__main__":
