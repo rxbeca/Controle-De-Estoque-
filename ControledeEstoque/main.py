@@ -7,15 +7,25 @@ from PySide6.QtWidgets import (
     QLineEdit, QSpinBox, QComboBox, QTextEdit, QTabWidget, QLabel
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
+
 from database import (
-    criar_banco, 
-    registrar_movimentacao_db, 
-    adicionar_item_ao_armario, 
+    criar_banco, registrar_movimentacao_db, adicionar_item_ao_armario,
+    verificar_credenciais, criar_usuario, gerar_token_redefinicao, redefinir_senha,
     excluir_item_db
 )
 
 
-# --- CADASTRAR UM NOVO ITEM ---
+def is_strong_password(password: str) -> tuple[bool, str]:
+    if not password or len(password) < 8:
+        return False, "A senha deve ter no mínimo 8 caracteres."
+    if not any(c.isalpha() for c in password):
+        return False, "A senha deve conter pelo menos uma letra."
+    if not any(c.isdigit() for c in password):
+        return False, "A senha deve conter pelo menos um número."
+    return True, ""
+
+
 class DialogNovoItem(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,14 +47,12 @@ class DialogNovoItem(QDialog):
         self.input_local.setPlaceholderText("Ex: Sala 04, Bloco B, Universidade...")
 
         self.combo_status = QComboBox()
-        self.combo_status.addItems(["DISPONIVEL", "EM_USO", "MANUTENCAO", "BAIXADO"])
+        self.combo_status.addItems(["DISPONIVEL", "EM_USO", "MANUTENCAO", "INDISPONIVEL"])
 
-        self.combo_categoria = QComboBox()
         self.combo_armario = QComboBox()
 
         self.carregar_combos()
 
-        # Adicionar elementos ao layout
         layout.addRow("Nome do Item *:", self.input_nome)
         layout.addRow("Descrição:", self.input_descricao)
         layout.addRow("Quantidade Inicial:", self.input_qtd)
@@ -52,8 +60,7 @@ class DialogNovoItem(QDialog):
         layout.addRow("Nº Protocolo / Plaqueta:", self.input_plaqueta)
         layout.addRow("Local na Universidade:", self.input_local)
         layout.addRow("Status:", self.combo_status)
-        layout.addRow("Categoria:", self.combo_categoria)
-        layout.addRow("Guardar no Armário:", self.combo_armario)
+        layout.addRow("Guardar no Armário (Opcional):", self.combo_armario)
 
         self.btn_salvar = QPushButton("Cadastrar Item")
         self.btn_salvar.clicked.connect(self.salvar_item)
@@ -63,13 +70,9 @@ class DialogNovoItem(QDialog):
         conexao = sqlite3.connect("estoque.db")
         cursor = conexao.cursor()
 
-        # Carregar Categorias
-        cursor.execute("SELECT id, nome FROM categorias")
-        for cat_id, nome in cursor.fetchall():
-            self.combo_categoria.addItem(nome, cat_id)
+        # Opção padrão para não vincular a nenhum armário
+        self.combo_armario.addItem("Itens de Bens da CENDE", None)
 
-        # Carregar Armários
-        self.combo_armario.addItem("Bens da CENDE", None)
         cursor.execute("SELECT id, nome FROM armarios")
         for arm_id, nome in cursor.fetchall():
             self.combo_armario.addItem(nome, arm_id)
@@ -84,9 +87,9 @@ class DialogNovoItem(QDialog):
         plaqueta = self.input_plaqueta.text().strip()
         local = self.input_local.text().strip()
         status = self.combo_status.currentText()
-        categoria_id = self.combo_categoria.currentData()
+        # Pega o ID/Nome do armário selecionado
         armario_id = self.combo_armario.currentData()
-        nome_armario = self.combo_armario.currentText()
+        nome_armario = self.combo_armario.currentText() if armario_id is not None else None
 
         if not nome:
             QMessageBox.warning(self, "Atenção", "O nome do item é obrigatório!")
@@ -97,16 +100,16 @@ class DialogNovoItem(QDialog):
             cursor = conexao.cursor()
             
             cursor.execute("""
-                INSERT INTO itens_cende (nome, descricao, quantidade_atual, patrimonio_pertence, 
-                                        numero_protocolo_plaqueta, local, status, categoria_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (nome, descricao, qtd, patrimonio, plaqueta, local, status, categoria_id))
+                INSERT INTO itens_cende (nome, descricao, quantidade_atual, patrimonio_pertence,
+                                        numero_protocolo_plaqueta, local, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (nome, descricao, qtd, patrimonio, plaqueta, local, status))
             
             conexao.commit()
             conexao.close()
 
-            # Vincular o item somente quando um armário foi selecionado
-            if armario_id is not None:
+            # Só adiciona no armário se um armário válido tiver sido escolhido
+            if nome_armario:
                 adicionar_item_ao_armario(nome_armario, nome)
 
             QMessageBox.information(self, "Sucesso", "Item cadastrado com sucesso!")
@@ -115,7 +118,213 @@ class DialogNovoItem(QDialog):
             QMessageBox.critical(self, "Erro", f"Erro ao salvar no banco: {e}")
 
 
-# --- DIÁLOGO DE REGISTRO DE MOVIMENTAÇÃO ---
+class LoginDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Login")
+        self.setFixedSize(1000, 600)
+
+        main_layout = QVBoxLayout(self)
+
+        self.logo_label = QLabel()
+        self.logo_label.setFixedHeight(220)
+        self.logo_label.setAlignment(Qt.AlignCenter)
+        self.logo_label.setStyleSheet("border: 1px solid #ccc; background: #f7f7f7;")
+        
+        try:
+            pix = QPixmap("logo.png")
+            if not pix.isNull():
+                self.logo_label.setPixmap(pix.scaledToHeight(200, Qt.SmoothTransformation))
+            else:
+                self.logo_label.setText("LOGO AQUI")
+        except Exception:
+            self.logo_label.setText("LOGO AQUI")
+
+        main_layout.addWidget(self.logo_label)
+
+        central_widget = QWidget()
+        central_layout = QVBoxLayout(central_widget)
+        central_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+
+        form_widget = QWidget()
+        form_widget.setFixedWidth(420)
+        form_layout = QFormLayout(form_widget)
+
+        self.input_username = QLineEdit()
+        self.input_password = QLineEdit()
+        self.input_password.setEchoMode(QLineEdit.Password)
+
+        form_layout.addRow("Usuário:", self.input_username)
+        form_layout.addRow("Senha:", self.input_password)
+
+        btns_layout = QHBoxLayout()
+        self.btn_login = QPushButton("Entrar")
+        self.btn_cadastrar = QPushButton("Cadastrar novo usuário")
+        self.btn_esqueceu = QPushButton("Esqueceu a senha?")
+
+        self.btn_login.clicked.connect(self.tentar_login)
+        self.btn_cadastrar.clicked.connect(self.abrir_cadastro)
+        self.btn_esqueceu.clicked.connect(self.abrir_esqueci)
+
+        btns_layout.addWidget(self.btn_login)
+        btns_layout.addWidget(self.btn_cadastrar)
+        btns_layout.addWidget(self.btn_esqueceu)
+
+        central_layout.addWidget(form_widget)
+        central_layout.addLayout(btns_layout)
+
+        main_layout.addWidget(central_widget)
+
+    def tentar_login(self):
+        username = self.input_username.text().strip()
+        senha = self.input_password.text().strip()
+        if not username or not senha:
+            QMessageBox.warning(self, "Atenção", "Preencha usuário e senha.")
+            return
+
+        if verificar_credenciais(username, senha):
+            self.accept()
+        else:
+            QMessageBox.critical(self, "Erro", "Usuário ou senha inválidos.")
+
+    def abrir_cadastro(self):
+        dialog = DialogCadastroUsuario(self)
+        dialog.exec()
+
+    def abrir_esqueci(self):
+        dialog = DialogEsqueciSenha(self)
+        dialog.exec()
+
+
+class DialogCadastroUsuario(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Cadastrar Usuário")
+        self.setFixedSize(360, 220)
+        layout = QFormLayout(self)
+
+        self.input_username = QLineEdit()
+        self.input_email = QLineEdit()
+        self.input_password = QLineEdit()
+        self.input_password.setEchoMode(QLineEdit.Password)
+        self.input_password2 = QLineEdit()
+        self.input_password2.setEchoMode(QLineEdit.Password)
+
+        layout.addRow("Usuário:", self.input_username)
+        layout.addRow("Email:", self.input_email)
+        layout.addRow("Senha:", self.input_password)
+        layout.addRow("Confirmar senha:", self.input_password2)
+
+        self.btn_salvar = QPushButton("Cadastrar")
+        self.btn_salvar.clicked.connect(self.cadastrar)
+        layout.addRow(self.btn_salvar)
+
+    def cadastrar(self):
+        user = self.input_username.text().strip()
+        email = self.input_email.text().strip()
+        p1 = self.input_password.text()
+        p2 = self.input_password2.text()
+
+        if not user or not email or not p1:
+            QMessageBox.warning(self, "Atenção", "Preencha todos os campos.")
+            return
+        if p1 != p2:
+            QMessageBox.warning(self, "Atenção", "Senhas não conferem.")
+            return
+        ok_pw, msg_pw = is_strong_password(p1)
+        if not ok_pw:
+            QMessageBox.warning(self, "Senha fraca", msg_pw)
+            return
+
+        ok, msg = criar_usuario(user, email, p1)
+        if ok:
+            QMessageBox.information(self, "Sucesso", msg)
+            self.accept()
+        else:
+            QMessageBox.critical(self, "Erro", msg)
+
+
+class DialogEsqueciSenha(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Recuperar Senha (Local)")
+        self.setFixedSize(360, 140)
+        layout = QFormLayout(self)
+
+        self.input_email = QLineEdit()
+        layout.addRow("Email cadastrado:", self.input_email)
+
+        self.btn_enviar = QPushButton("Gerar token de redefinição")
+        self.btn_enviar.clicked.connect(self.enviar_link)
+        layout.addRow(self.btn_enviar)
+
+    def enviar_link(self):
+        email = self.input_email.text().strip()
+        if not email:
+            QMessageBox.warning(self, "Atenção", "Informe o email cadastrado.")
+            return
+
+        ok, token_or_msg = gerar_token_redefinicao(email)
+        if not ok:
+            QMessageBox.critical(self, "Erro", token_or_msg)
+            return
+        token = token_or_msg
+
+        QMessageBox.information(self, "Token gerado",
+                                "Token de redefinição gerado. Você pode redefinir a senha localmente a seguir.")
+        dlg = DialogRedefinirSenha(token, self)
+        dlg.exec()
+        self.accept()
+
+
+class DialogRedefinirSenha(QDialog):
+    def __init__(self, token=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Redefinir Senha (Local)")
+        self.setFixedSize(420, 200)
+
+        layout = QFormLayout(self)
+        self.input_token = QLineEdit()
+        if token:
+            self.input_token.setText(token)
+        self.input_senha = QLineEdit()
+        self.input_senha.setEchoMode(QLineEdit.Password)
+        self.input_senha2 = QLineEdit()
+        self.input_senha2.setEchoMode(QLineEdit.Password)
+
+        layout.addRow("Token:", self.input_token)
+        layout.addRow("Nova senha:", self.input_senha)
+        layout.addRow("Confirmar senha:", self.input_senha2)
+
+        self.btn_redefinir = QPushButton("Redefinir senha")
+        self.btn_redefinir.clicked.connect(self.redefinir)
+        layout.addRow(self.btn_redefinir)
+
+    def redefinir(self):
+        token = self.input_token.text().strip()
+        p1 = self.input_senha.text()
+        p2 = self.input_senha2.text()
+
+        if not token or not p1:
+            QMessageBox.warning(self, "Atenção", "Preencha o token e a nova senha.")
+            return
+        if p1 != p2:
+            QMessageBox.warning(self, "Atenção", "Senhas não conferem.")
+            return
+
+        ok_pw, msg_pw = is_strong_password(p1)
+        if not ok_pw:
+            QMessageBox.warning(self, "Senha fraca", msg_pw)
+            return
+
+        ok, msg = redefinir_senha(token, p1)
+        if ok:
+            QMessageBox.information(self, "Sucesso", msg)
+            self.accept()
+        else:
+            QMessageBox.critical(self, "Erro", msg)
+
+
 class DialogMovimentacao(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -174,7 +383,6 @@ class DialogMovimentacao(QDialog):
             QMessageBox.critical(self, "Erro", f"Falha na operação: {msg}")
 
 
-# --- JANELA PRINCIPAL COM ABAS ---
 class JanelaPrincipal(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -200,26 +408,36 @@ class JanelaPrincipal(QMainWindow):
         self.btn_movimentacao.clicked.connect(self.abrir_movimentacao)
         self.layout_botoes.addWidget(self.btn_movimentacao)
 
-        # Botão de Exclusão
-        self.btn_excluir_item = QPushButton("Excluir Item Selecionado")
+        self.btn_excluir_item = QPushButton("Excluir Item")
         self.btn_excluir_item.setStyleSheet("background-color: #d9534f; color: white; font-weight: bold;")
         self.btn_excluir_item.clicked.connect(self.excluir_item_selecionado)
         self.layout_botoes.addWidget(self.btn_excluir_item)
 
+        self.btn_sair = QPushButton("Sair")
+        self.btn_sair.clicked.connect(self.logout)
+        self.layout_botoes.addWidget(self.btn_sair)
+
         self.layout_principal.addLayout(self.layout_botoes)
 
-        # Sistema de Abas
+        # Abas
         self.abas = QTabWidget()
         
         # Aba 1: Itens da CENDE
         self.aba_itens = QWidget()
         self.layout_aba_itens = QVBoxLayout(self.aba_itens)
+
+        self.input_pesquisa_item = QLineEdit()
+        self.input_pesquisa_item.setPlaceholderText("Pesquisar item pelo nome...")
+        self.input_pesquisa_item.textChanged.connect(self.filtrar_itens)
+        self.layout_aba_itens.addWidget(self.input_pesquisa_item)
+
         self.tabela_itens = QTableWidget()
-        self.tabela_itens.setColumnCount(9)
+        self.tabela_itens.setColumnCount(8)
         self.tabela_itens.setHorizontalHeaderLabels([
-            "ID", "Nome", "Descrição", "Qtd", "Patrimônio", "Plaqueta", "Local", "Status", "Categoria"
+            "ID", "Nome", "Descrição", "Qtd", "Patrimônio", "Plaqueta", "Local", "Status"
         ])
         self.tabela_itens.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tabela_itens.setSelectionBehavior(QTableWidget.SelectRows)
         self.layout_aba_itens.addWidget(self.tabela_itens)
         self.abas.addTab(self.aba_itens, "Itens da CENDE")
 
@@ -245,7 +463,6 @@ class JanelaPrincipal(QMainWindow):
 
         self.layout_principal.addWidget(self.abas)
 
-        # Carregar dados iniciais
         self.carregar_armarios_combo()
         self.atualizar_tudo()
 
@@ -260,11 +477,10 @@ class JanelaPrincipal(QMainWindow):
             cursor = conexao.cursor()
             
             query = """
-                SELECT i.id, i.nome, i.descricao, i.quantidade_atual, 
-                       i.patrimonio_pertence, i.numero_protocolo_plaqueta, 
-                       i.local, i.status, c.nome
-                FROM itens_cende i
-                LEFT JOIN categorias c ON i.categoria_id = c.id
+                SELECT id, nome, descricao, quantidade_atual,
+                       patrimonio_pertence, numero_protocolo_plaqueta,
+                       local, status
+                FROM itens_cende
             """
             cursor.execute(query)
             itens = cursor.fetchall()
@@ -281,6 +497,15 @@ class JanelaPrincipal(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao carregar itens:\n{e}")
+
+    def filtrar_itens(self, texto):
+        """Exibe somente as linhas cujo nome contém o texto pesquisado."""
+        texto = texto.strip().casefold()
+
+        for linha in range(self.tabela_itens.rowCount()):
+            item_nome = self.tabela_itens.item(linha, 1)
+            nome = item_nome.text().casefold() if item_nome else ""
+            self.tabela_itens.setRowHidden(linha, texto not in nome)
 
     def carregar_armarios_combo(self):
         self.combo_filtro_armario.clear()
@@ -319,9 +544,9 @@ class JanelaPrincipal(QMainWindow):
 
     def excluir_item_selecionado(self):
         linha_selecionada = self.tabela_itens.currentRow()
-
+        
         if linha_selecionada == -1:
-            QMessageBox.warning(self, "Atenção", "Selecione um item na tabela de itens da CENDE para excluir.")
+            QMessageBox.warning(self, "Atenção", "Selecione uma linha na tabela para excluir.")
             return
 
         item_id = self.tabela_itens.item(linha_selecionada, 0).text()
@@ -330,8 +555,7 @@ class JanelaPrincipal(QMainWindow):
         resposta = QMessageBox.question(
             self,
             "Confirmar Exclusão",
-            f"Tem certeza que deseja excluir o item '{nome_item}' (ID: {item_id})?\n\n"
-            "Isso removerá também o histórico de movimentações e referências em armários.",
+            f"Deseja excluir permanentemente o item '{nome_item}' (ID: {item_id})?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -342,12 +566,26 @@ class JanelaPrincipal(QMainWindow):
                 QMessageBox.information(self, "Sucesso", msg)
                 self.atualizar_tudo()
             else:
-                QMessageBox.critical(self, "Erro", msg)
+                QMessageBox.critical(self, "Erro", f"Erro ao excluir o item: {msg}")
+
+    def logout(self):
+        login = LoginDialog(self)
+        self.hide()
+        if login.exec() == QDialog.Accepted:
+            self.show()
+            self.atualizar_tudo()
+        else:
+            QApplication.quit()
 
 
 if __name__ == "__main__":
     criar_banco()
     app = QApplication(sys.argv)
-    janela = JanelaPrincipal()
-    janela.show()
-    sys.exit(app.exec())
+
+    login = LoginDialog()
+    if login.exec() == QDialog.Accepted:
+        janela = JanelaPrincipal()
+        janela.show()
+        sys.exit(app.exec())
+    else:
+        sys.exit(0)
