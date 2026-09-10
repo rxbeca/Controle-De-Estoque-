@@ -12,7 +12,7 @@ from PySide6.QtGui import QPixmap
 from database import (
     criar_banco, registrar_movimentacao_db, adicionar_item_ao_armario,
     verificar_credenciais, criar_usuario, gerar_token_redefinicao, redefinir_senha,
-    excluir_item_db
+    excluir_item_db,direto_no_armario,remover_item_do_armario
 )
 
 
@@ -44,7 +44,7 @@ class DialogNovoItem(QDialog):
         self.input_patrimonio = QLineEdit()
         self.input_plaqueta = QLineEdit()
         self.input_local = QLineEdit()
-        self.input_local.setPlaceholderText("Ex: Sala 04, Bloco B, Universidade...")
+        self.input_local.setPlaceholderText("Ex: Sala 04, Piso, Bloco, etc.")
 
         self.combo_status = QComboBox()
         self.combo_status.addItems(["DISPONIVEL", "EM_USO", "MANUTENCAO", "INDISPONIVEL"])
@@ -87,7 +87,6 @@ class DialogNovoItem(QDialog):
         plaqueta = self.input_plaqueta.text().strip()
         local = self.input_local.text().strip()
         status = self.combo_status.currentText()
-        # Pega o ID/Nome do armário selecionado
         armario_id = self.combo_armario.currentData()
         nome_armario = self.combo_armario.currentText() if armario_id is not None else None
 
@@ -96,23 +95,26 @@ class DialogNovoItem(QDialog):
             return
 
         try:
-            conexao = sqlite3.connect("estoque.db")
-            cursor = conexao.cursor()
-            
-            cursor.execute("""
-                INSERT INTO itens_cende (nome, descricao, quantidade_atual, patrimonio_pertence,
-                                        numero_protocolo_plaqueta, local, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (nome, descricao, qtd, patrimonio, plaqueta, local, status))
-            
-            conexao.commit()
-            conexao.close()
+            if armario_id is None:
+                conexao = sqlite3.connect("estoque.db")
+                cursor = conexao.cursor()
 
-            # Só adiciona no armário se um armário válido tiver sido escolhido
-            if nome_armario:
-                adicionar_item_ao_armario(nome_armario, nome)
+                cursor.execute("""
+                    INSERT INTO itens_cende (nome, descricao, quantidade_atual, patrimonio_pertence,
+                                            numero_protocolo_plaqueta, local, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (nome, descricao, qtd, patrimonio, plaqueta, local, status))
 
-            QMessageBox.information(self, "Sucesso", "Item cadastrado com sucesso!")
+                conexao.commit()
+                conexao.close()
+                QMessageBox.information(self, "Sucesso", "Item cadastrado na lista de bens da CENDE com sucesso!")
+            else:
+                sucesso, msg = direto_no_armario(armario_id, nome)
+                if not sucesso:
+                    QMessageBox.critical(self, "Erro", f"Erro ao salvar no armário: {msg}")
+                    return
+                QMessageBox.information(self, "Sucesso", f"Item salvo apenas no armário '{nome_armario}'!")
+
             self.accept()
         except Exception as e:
             QMessageBox.critical(self, "Erro", f"Erro ao salvar no banco: {e}")
@@ -427,7 +429,7 @@ class JanelaPrincipal(QMainWindow):
         self.layout_aba_itens = QVBoxLayout(self.aba_itens)
 
         self.input_pesquisa_item = QLineEdit()
-        self.input_pesquisa_item.setPlaceholderText("Pesquisar item pelo nome...")
+        self.input_pesquisa_item.setPlaceholderText("Pesquisar item...")
         self.input_pesquisa_item.textChanged.connect(self.filtrar_itens)
         self.layout_aba_itens.addWidget(self.input_pesquisa_item)
 
@@ -519,18 +521,20 @@ class JanelaPrincipal(QMainWindow):
     def carregar_itens_armario(self):
         self.tabela_armarios.setRowCount(0)
         armario_id = self.combo_filtro_armario.currentData()
-        if not armario_id:
+        if armario_id is None:
             return
 
         conexao = sqlite3.connect("estoque.db")
         cursor = conexao.cursor()
-        cursor.execute("SELECT nome_item FROM itens_armario WHERE armario_id = ?", (armario_id,))
+        cursor.execute("SELECT id, nome_item FROM itens_armario WHERE armario_id = ?", (armario_id,))
         itens = cursor.fetchall()
         conexao.close()
 
         self.tabela_armarios.setRowCount(len(itens))
-        for linha_idx, item in enumerate(itens):
-            self.tabela_armarios.setItem(linha_idx, 0, QTableWidgetItem(item[0]))
+        for linha_idx, (item_id, nome_item) in enumerate(itens):
+            widget_item = QTableWidgetItem(nome_item)
+            widget_item.setData(Qt.UserRole, item_id)
+            self.tabela_armarios.setItem(linha_idx, 0, widget_item)
 
     def abrir_cadastro_item(self):
         dialogo = DialogNovoItem(self)
@@ -543,30 +547,63 @@ class JanelaPrincipal(QMainWindow):
             self.atualizar_tudo()
 
     def excluir_item_selecionado(self):
-        linha_selecionada = self.tabela_itens.currentRow()
-        
-        if linha_selecionada == -1:
-            QMessageBox.warning(self, "Atenção", "Selecione uma linha na tabela para excluir.")
+        aba_atual = self.abas.currentIndex()
+
+        if aba_atual == 0:
+            linha_selecionada = self.tabela_itens.currentRow()
+            if linha_selecionada == -1:
+                QMessageBox.warning(self, "Atenção", "Selecione uma linha na tabela para excluir.")
+                return
+
+            item_id = self.tabela_itens.item(linha_selecionada, 0).text()
+            nome_item = self.tabela_itens.item(linha_selecionada, 1).text()
+
+            resposta = QMessageBox.question(
+                self,
+                "Confirmar Exclusão",
+                f"Deseja excluir permanentemente o item '{nome_item}' (ID: {item_id})?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            if resposta == QMessageBox.Yes:
+                sucesso, msg = excluir_item_db(int(item_id))
+                if sucesso:
+                    QMessageBox.information(self, "Sucesso", msg)
+                    self.atualizar_tudo()
+                else:
+                    QMessageBox.critical(self, "Erro", f"Erro ao excluir o item: {msg}")
             return
 
-        item_id = self.tabela_itens.item(linha_selecionada, 0).text()
-        nome_item = self.tabela_itens.item(linha_selecionada, 1).text()
+        if aba_atual == 1:
+            linha_selecionada = self.tabela_armarios.currentRow()
+            if linha_selecionada == -1:
+                QMessageBox.warning(self, "Atenção", "Selecione um item do armário para excluir.")
+                return
 
-        resposta = QMessageBox.question(
-            self,
-            "Confirmar Exclusão",
-            f"Deseja excluir permanentemente o item '{nome_item}' (ID: {item_id})?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+            item_table = self.tabela_armarios.item(linha_selecionada, 0)
+            if item_table is None:
+                QMessageBox.warning(self, "Atenção", "Item inválido para exclusão.")
+                return
 
-        if resposta == QMessageBox.Yes:
-            sucesso, msg = excluir_item_db(int(item_id))
-            if sucesso:
-                QMessageBox.information(self, "Sucesso", msg)
-                self.atualizar_tudo()
-            else:
-                QMessageBox.critical(self, "Erro", f"Erro ao excluir o item: {msg}")
+            item_armario_id = item_table.data(Qt.UserRole)
+            nome_item = item_table.text()
+
+            resposta = QMessageBox.question(
+                self,
+                "Confirmar Exclusão",
+                f"Deseja excluir permanentemente o item '{nome_item}' deste armário?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+
+            if resposta == QMessageBox.Yes:
+                sucesso, msg = remover_item_do_armario(int(item_armario_id))
+                if sucesso:
+                    QMessageBox.information(self, "Sucesso", msg)
+                    self.atualizar_tudo()
+                else:
+                    QMessageBox.critical(self, "Erro", f"Erro ao excluir o item: {msg}")
 
     def logout(self):
         login = LoginDialog(self)
@@ -576,7 +613,55 @@ class JanelaPrincipal(QMainWindow):
             self.atualizar_tudo()
         else:
             QApplication.quit()
+#   onde o item fique apenas no armario e nao vinculado a tabela de bens da cende
 
+class DialogNovoItemArmario(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Cadastrar Novo Armário")
+        self.setFixedSize(360, 180)
+
+        layout = QFormLayout(self)
+
+        self.input_nome = QLineEdit()
+        self.combo_armario = QComboBox()
+
+        self.carregar_armarios()
+
+        layout.addRow("Nome do Item *:", self.input_nome)
+        layout.addRow("Armário *:", self.combo_armario)
+
+        self.btn_salvar = QPushButton("Guardar no Armário")
+        self.btn_salvar.clicked.connect(self.salvar_item)
+        layout.addRow(self.btn_salvar)
+
+    def carregar_armarios(self):
+        conexao = sqlite3.connect("estoque.db")
+        cursor = conexao.cursor()
+        cursor.execute("SELECT id, nome FROM armarios")
+        for arm_id,nome in cursor .fetchall():
+            self.combo_armario.addItem(nome, arm_id)
+        conexao.close()
+    def salvar_item(self):
+        nome = self.input_nome.text().strip()
+        armario_id = self.combo_armario.currentData()
+        nome_armario = self.combo_armario.currentText()
+
+        if not nome:
+            QMessageBox.warning(self, "Atenção", "O nome do item é obrigatório!")
+            return
+
+        if not armario_id:
+            QMessageBox.warning(self, "Atenção", "Selecione um armário válido!")            
+            return 
+
+        # salvar na tabela de itens_armario
+        sucesso, msg = direto_no_armario(armario_id, nome)
+        if sucesso:
+            QMessageBox.information(self, "Sucesso", msg)
+            self.accept()
+        else :
+            QMessageBox.critical(self, "Erro", f"Erro ao salvar no armário: {msg}")
 
 if __name__ == "__main__":
     criar_banco()
