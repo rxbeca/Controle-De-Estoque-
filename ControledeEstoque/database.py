@@ -186,7 +186,7 @@ def get_user_by_email(email: str):
         conexao.close()
 
 
-def gerar_token_redefinicao(email: str) -> tuple[bool, str]:
+def gerar_token_redefinicao(email: str) ->  tuple[bool, str]:
     user = get_user_by_email(email)
     if not user:
         return False, "Email não cadastrado"
@@ -303,6 +303,38 @@ def excluir_item_db(item_id: int):
         return False, str(e)
     finally:
         conexao.close()
+
+
+
+def direto_no_armario(armario_id, nome_item):
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    try:
+        cursor.execute("""INSERT INTO itens_armario (armario_id, nome_item) VALUES (?, ?)""", (armario_id, nome_item))
+        conexao.commit()
+        return True, "Item adicionado ao armário com sucesso!"
+    except Exception as e:
+        conexao.rollback()
+        return False, str(e)
+    finally:
+        conexao.close()
+
+def remover_item_do_armario(item_armario_id: int):
+    """remove um item exclusivo da lista de armarios que voce ja cadastrou."""
+    conexao = sqlite3.connect("estoque.db") 
+    cursor  = conexao.cursor()
+    try:
+        cursor.execute("DELETE FROM itens_armario WHERE id = ?", (item_armario_id,))
+        conexao.commit()
+        return True, "Item removido do armário com sucesso!"
+    except Exception as e:
+        conexao.rollback()
+        return False, str(e)
+    finally:
+        conexao.close()
+
+# Compatibilidade com versões anteriores que ainda chamavam o nome com typo.
+direto_no_aramrio = direto_no_armario
 
 
 if __name__ == "__main__":
