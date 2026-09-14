@@ -471,7 +471,7 @@ class JanelaPrincipal(QMainWindow):
 
         self.tabela_itens.itemChanged.connect(self.salvar_edicao_celula)
 
-# editar item dos aramarios pq eu quero qeu de pra musar o deles tambem 
+# editar item dos armarios pq eu quero que de pra mudar o deles tambem 
 
 
         self.tabela_armarios.itemChanged.connect(self.salvar_edicao_dos_armarios)
