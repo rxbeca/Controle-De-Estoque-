@@ -10,9 +10,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 
 from database import (
-    criar_banco, registrar_movimentacao_db, adicionar_item_ao_armario,
-    verificar_credenciais, criar_usuario, gerar_token_redefinicao, redefinir_senha,
-    excluir_item_db,direto_no_armario,remover_item_do_armario
+    criar_banco, registrar_movimentacao_db, ediçao_de_itens,    verificar_credenciais, criar_usuario, gerar_token_redefinicao, redefinir_senha,
+    excluir_item_db,direto_no_armario,remover_item_do_armario,atualizar_dentro_dos_armarios
 )
 
 
@@ -438,6 +437,7 @@ class JanelaPrincipal(QMainWindow):
         self.tabela_itens.setHorizontalHeaderLabels([
             "ID", "Nome", "Descrição", "Qtd", "Patrimônio", "Plaqueta", "Local", "Status"
         ])
+        self.tabela_itens.setColumnHidden(0, True)
         self.tabela_itens.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tabela_itens.setSelectionBehavior(QTableWidget.SelectRows)
         self.layout_aba_itens.addWidget(self.tabela_itens)
@@ -455,8 +455,9 @@ class JanelaPrincipal(QMainWindow):
         layout_filtro_armario.addStretch()
 
         self.tabela_armarios = QTableWidget()
-        self.tabela_armarios.setColumnCount(1)
-        self.tabela_armarios.setHorizontalHeaderLabels(["Nome dos Itens Presentes neste Armário"])
+        self.tabela_armarios.setColumnCount(2)
+        self.tabela_armarios.setHorizontalHeaderLabels(["ID", "Nome dos Itens Presentes neste Armário"])
+        self.tabela_armarios.setColumnHidden(0, True)
         self.tabela_armarios.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
         self.layout_aba_armarios.addLayout(layout_filtro_armario)
@@ -467,6 +468,15 @@ class JanelaPrincipal(QMainWindow):
 
         self.carregar_armarios_combo()
         self.atualizar_tudo()
+
+        self.tabela_itens.itemChanged.connect(self.salvar_edicao_celula)
+
+# editar item dos aramarios pq eu quero qeu de pra musar o deles tambem 
+
+
+        self.tabela_armarios.itemChanged.connect(self.salvar_edicao_dos_armarios)
+
+
 
     def atualizar_tudo(self):
         self.carregar_itens_cende()
@@ -519,22 +529,35 @@ class JanelaPrincipal(QMainWindow):
         conexao.close()
 
     def carregar_itens_armario(self):
-        self.tabela_armarios.setRowCount(0)
-        armario_id = self.combo_filtro_armario.currentData()
-        if armario_id is None:
-            return
+        self.tabela_armarios.blockSignals(True)
+        try:
+            self.tabela_armarios.setRowCount(0)
+            armario_id = self.combo_filtro_armario.currentData()
+            if not armario_id:
+                return
 
-        conexao = sqlite3.connect("estoque.db")
-        cursor = conexao.cursor()
-        cursor.execute("SELECT id, nome_item FROM itens_armario WHERE armario_id = ?", (armario_id,))
-        itens = cursor.fetchall()
-        conexao.close()
+            conexao = sqlite3.connect("estoque.db")
+            cursor = conexao.cursor()
+            cursor.execute(
+                "SELECT id, nome_item FROM itens_armario WHERE armario_id = ?",
+                (armario_id,),
+            )
+            itens = cursor.fetchall()
+            conexao.close()
 
-        self.tabela_armarios.setRowCount(len(itens))
-        for linha_idx, (item_id, nome_item) in enumerate(itens):
-            widget_item = QTableWidgetItem(nome_item)
-            widget_item.setData(Qt.UserRole, item_id)
-            self.tabela_armarios.setItem(linha_idx, 0, widget_item)
+            self.tabela_armarios.setRowCount(len(itens))
+            for linha_idx, (item_id, nome_item) in enumerate(itens):
+                item_widget = QTableWidgetItem(str(item_id))
+                item_widget.setTextAlignment(Qt.AlignCenter)
+                item_widget.setFlags(item_widget.flags() & ~Qt.ItemIsEditable)
+
+                nome_widget = QTableWidgetItem(str(nome_item))
+                self.tabela_armarios.setItem(linha_idx, 0, item_widget)
+                self.tabela_armarios.setItem(linha_idx, 1, nome_widget)
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao carregar itens do armário:\n{e}")
+        finally:
+            self.tabela_armarios.blockSignals(False)
 
     def abrir_cadastro_item(self):
         dialogo = DialogNovoItem(self)
@@ -613,6 +636,68 @@ class JanelaPrincipal(QMainWindow):
             self.atualizar_tudo()
         else:
             QApplication.quit()
+
+# fazer com que de para editar uma celula da tabela e fazer com que as alterações fiquem salvas após atualizar os dados
+    def salvar_edicao_celula(self, item_widget):
+        linha = item_widget.row()
+        coluna = item_widget.column()
+
+        item_id_widget = self.tabela_itens.item(linha,0)
+        if not item_id_widget:
+            return 
+        item_id = item_id_widget.text()
+        novo_valor = item_widget.text()
+
+        mapa_colunas ={
+            1: "nome",
+            2:"descricao",
+            3:"quantidade_atual",
+            4:"patrimonio_pertence",
+            5:"numero_protocolo_plaqueta",
+            6:"local",
+            7:"status"
+        }
+
+        if coluna not in mapa_colunas:
+            return 
+        coluna_nome = mapa_colunas[coluna]
+
+        self.tabela_itens.blockSignals(True)
+        sucesso, msg = ediçao_de_itens(item_id, coluna_nome, novo_valor)
+        self.tabela_itens.blockSignals(False)
+        if not sucesso:
+            QMessageBox.critical(self, "Erro", f"Erro ao realizar edição: {msg}")
+            self.carregar_itens_cende()
+
+
+#onde começa a brincadeira pra poder editar essas porrinhas (itens dos armarios)
+    def salvar_edicao_dos_armarios(self, item_widget):
+        linha = item_widget.row()
+        coluna = item_widget.column()
+
+        if coluna != 1:
+          return 
+        item_id_widget = self.tabela_armarios.item(linha, 0)
+        if not item_id_widget:
+            return
+
+        item_armario_id = item_id_widget.text()
+        item_novo_nome = item_widget.text().strip()
+
+        if not item_novo_nome:
+            QMessageBox.warning(self, "Atenção", "O nome do item não pode ser vazio.")
+            self.carregar_itens_armario()
+            return
+        self.tabela_armarios.blockSignals(True)
+        sucesso, msg = atualizar_dentro_dos_armarios(int (item_armario_id), item_novo_nome)
+        self.tabela_armarios.blockSignals(False)
+
+        if not sucesso:
+            QMessageBox.critical(self, "Erro", f"Erro ao atualizar item do armário: {msg}")
+            self.carregar_armarios_combo()
+
+
+
 #   onde o item fique apenas no armario e nao vinculado a tabela de bens da cende
 
 class DialogNovoItemArmario(QDialog):
