@@ -332,7 +332,48 @@ def remover_item_do_armario(item_armario_id: int):
         return False, str(e)
     finally:
         conexao.close()
+# onde da pra editar os itens da tabela 
+def ediçao_de_itens(item_id:int,coluna:str,valor):
+    colunas_permitidas ={
+        "nome":"nome",
+        "descricao":"descricao",
+        "quantidade_atual":"quantidade_atual",
+        "patrimonio_pertence":"patrimonio_pertence",
+        "numero_protocolo_plaqueta":"numero_protocolo_plaqueta",
+        "local":"local",
+        "status":"status"
+    }
 
+    if coluna not in colunas_permitidas:
+        return False, "Coluna inválida para edição."
+    nome_coluna_db = colunas_permitidas[coluna]
+
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    try:
+        query = f"UPDATE itens_cende SET {nome_coluna_db} = ? WHERE id = ?"
+        cursor.execute(query, (valor,item_id))
+        conexao.commit()
+        return True, "Item atualizado com sucesso!"
+    except Exception as e:
+        conexao.rollback()
+        return False, str(e)
+    finally:
+        conexao.close()
+
+
+def atualizar_dentro_dos_armarios(item_armario_id: int, novo_nome:str):
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    try:
+        cursor.execute("""UPDATE itens_armario SET nome_item =? WHERE id =?""", (novo_nome, item_armario_id))
+        conexao.commit()
+        return True , "Item do armáro arualizado com sucesso!"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conexao.close()
+     
 # Compatibilidade com versões anteriores que ainda chamavam o nome com typo.
 direto_no_aramrio = direto_no_armario
 
