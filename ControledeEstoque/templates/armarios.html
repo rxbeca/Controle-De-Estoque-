@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Armários - Estoque do CENDE</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 2rem; background: #f4f6f9; color: #333; font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+        .header-links { display: flex; gap: 1rem; }
+        .header-links a { font-weight: bold; text-decoration: none; }
+        .dashboard-link { color: #2563eb; }
+        .logout-link { color: #d9534f; }
+        .armarios-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+        .armario-card { background: #fff; padding: 1.25rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .armario-card h2 { margin-top: 0; margin-bottom: 1rem; color: #2563eb; }
+        .armario-form { display: flex; gap: 8px; margin-bottom: 1rem; }
+        .armario-form input { min-width: 0; flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .btn-primary, .btn-danger { border: none; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #2563eb; }
+        .btn-danger { background: #d9534f; padding: 4px 8px; }
+        .armario-itens { padding-left: 1.25rem; margin: 0; }
+        .armario-item { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+        .armario-item form { flex-shrink: 0; }
+        .vazio { color: #666; }
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            .header-bar { align-items: flex-start; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <h1>Armários (Usuário: <b>{{ usuario }}</b>)</h1>
+        <div class="header-links">
+            <a class="dashboard-link" href="{{ url_for('dashboard') }}">Itens gerais</a>
+            <a class="logout-link" href="{{ url_for('logout') }}">Sair</a>
+        </div>
+    </div>
+    <div style="margin-bottom: 20px;">
+        <input type="text"
+        id="inputPesquisaGeral"
+        onkeyup="filtrarGeral()"
+        placeholder="Pesquisar item..."
+        style="width:100%; padding: 10px; font-size: 16px;"/>
+    </div>
+
+    <div class="armarios-grid">
+        {% for armario in armarios %}
+        <section class="armario-card">
+            <h2>{{ armario.nome }}</h2>
+            <form class="armario-form" action="{{ url_for('novo_item_armario', armario_id=armario.id) }}" method="post">
+                <input type="text" name="nome_item" placeholder="Nome do item" required>
+                <button type="submit" class="btn-primary">Adicionar</button>
+            </form>
+            {% if armario.itens %}
+            <ul class="armario-itens">
+                {% for item_armario in armario.itens %}
+                <li class="armario-item">
+                    <span>{{ item_armario.nome }}</span>
+                    <form action="{{ url_for('excluir_item_armario_rota', item_id=item_armario.id) }}" method="post">
+                        <button type="submit" class="btn-danger">Excluir</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="vazio">Nenhum item cadastrado.</p>
+            {% endif %}
+        </section>
+        {% endfor %}
+    </div>
+     <script>
+         function filtrarGeral(){
+            const filtro = document.getElementById("inputPesquisaGeral").value.toLowerCase();
+            const armarios = document.querySelectorAll(".armario-card");
+            armarios.forEach(armario => {
+                const texto = armario.textContent.toLowerCase();
+                armario.style.display = texto.includes(filtro) ? "" : "none";
+            });
+         }
+    </script>
+</body>
+</html>

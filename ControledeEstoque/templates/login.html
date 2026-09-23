@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso ao Sistema - Estoque do CENDE</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="login-card-modern">
+            <div class="login-left-panel">
+                <div class="panel-content">
+                    <h1>Estoque CENDE</h1>
+                    <p class="panel-subtitle">Olá caro colaborador, seja bem-vindo novamente!</p>
+                    <p class="panel-desc">Caso ainda não tenha um login, contate seu supervisor para criá-lo.</p>
+                </div>
+                <div class="panel-illustration">
+                    <svg viewBox="0 0 400 180" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
+                        <path d="M20,120 L100,120 L100,170 L20,170 Z" fill="#1e1b4b" opacity="0.2"/>
+                        <rect x="25" y="130" width="20" height="15" fill="#fcd34d" rx="2"/>
+                        <rect x="50" y="130" width="25" height="15" fill="#fbbf24" rx="2"/>
+                        <rect x="35" y="105" width="25" height="15" fill="#f59e0b" rx="2"/>
+                        <circle cx="160" cy="95" r="15" fill="#0f172a"/>
+                        <path d="M140,140 C140,115 180,115 180,140 Z" fill="#0284c7"/>
+                        <rect x="145" y="135" width="40" height="35" fill="#0f172a" rx="4"/>
+                        <path d="M280,100 L370,100 L370,170 L280,170 Z" fill="#1e1b4b" opacity="0.2"/>
+                        <rect x="290" y="115" width="20" height="15" fill="#fcd34d" rx="2"/>
+                        <rect x="320" y="145" width="22" height="15" fill="#fbbf24" rx="2"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="login-right-panel">
+                <div class="form-header">
+                    <h2>Acesso ao Sistema</h2>
+                </div>
+
+                {% if erro %}
+                    <div class="alert-error">{{ erro }}</div>
+                {% endif %}
+
+                <form class="login-form-modern" action="/login" method="post">
+                    <div class="input-group-modern">
+                        <label for="usuario">Usuário</label>
+                        <input type="text" id="usuario" name="usuario" placeholder="Digite seu usuário" required autocomplete="off">
+                    </div>
+
+                    <div class="input-group-modern">
+                        <label for="senha">Senha</label>
+                        <input type="password" name="senha" id="senha" placeholder="Digite sua senha" required>
+                    </div>
+
+                    <button type="submit" class="btn-submit-modern">Acessar Sistema</button>
+                </form>
+
+                <div style="text-align:center; margin-top:12px;">
+                    <button id="toggle-register" class="btn-link" style="background:none;border:none;color:#2563eb;cursor:pointer;">Criar conta</button>
+                </div>
+
+                <form id="register-form" action="/register" method="post" style="display:none; margin-top:12px;">
+                    <div class="input-group-modern">
+                        <label for="novo_usuario">Novo usuário</label>
+                        <input type="text" id="novo_usuario" name="novo_usuario" placeholder="Nome de usuário" required autocomplete="off">
+                    </div>
+
+                    <div class="input-group-modern">
+                        <label for="novo_email">Email</label>
+                        <input type="email" id="novo_email" name="novo_email" placeholder="seu@email.com" required>
+                    </div>
+
+                    <div class="input-group-modern">
+                        <label for="nova_senha">Senha</label>
+                        <input type="password" id="nova_senha" name="nova_senha" placeholder="Digite uma senha" required>
+                    </div>
+
+                    <div class="input-group-modern">
+                        <label for="confirma_senha">Confirmar senha</label>
+                        <input type="password" id="confirma_senha" name="confirma_senha" placeholder="Confirme a senha" required>
+                    </div>
+
+                    <button type="submit" class="btn-submit-modern" style="background:#10b981;">Criar usuário</button>
+                </form>
+
+                <script>
+                    document.getElementById('toggle-register').addEventListener('click', function(e){
+                        e.preventDefault();
+                        var f = document.getElementById('register-form');
+                        f.style.display = (f.style.display === 'none' || f.style.display === '') ? 'block' : 'none';
+                    });
+                </script>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -2,132 +2,71 @@ import sqlite3
 import hashlib
 import os
 import binascii
-from datetime import datetime, timedelta
+
 
 def criar_banco():
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
 
-    # Tabela Principal dos Itens da CENDE
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS itens_cende (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
-            descricao TEXT,
-            quantidade_atual INTEGER DEFAULT 0,
-            patrimonio_pertence TEXT,
-            numero_protocolo_plaqueta TEXT,
-            local TEXT,
+            descricao TEXT NOT NULL,
+            patrimonio_pertence TEXT NOT NULL,
+            numero_protocolo_plaqueta TEXT NOT NULL,
+            local TEXT NOT NULL,
             status TEXT CHECK(status IN ('DISPONIVEL', 'EM_USO', 'MANUTENCAO', 'INDISPONIVEL')) DEFAULT 'DISPONIVEL'
         )
-    """)
+        """
+    )
 
-    # 3. Tabela de Armários
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS armarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL UNIQUE
         )
-    """)
+        """
+    )
 
-    # 4. Tabela de ligação: itens no armário
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS itens_armario (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             armario_id INTEGER NOT NULL,
             nome_item TEXT NOT NULL,
             FOREIGN KEY (armario_id) REFERENCES armarios(id)
         )
-    """)
+        """
+    )
 
-    # 5. Tabela de Tipos de Movimentação
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tipos_movimentacao (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            tipo TEXT CHECK(tipo IN ('ENTRADA', 'SAIDA')) NOT NULL
-        )
-    """)
-
-    # 6. Tabela de Movimentações
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS movimentacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_id INTEGER,
-            tipo_movimentacao_id INTEGER,
-            quantidade INTEGER NOT NULL,
-            data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            observacao TEXT,
-            FOREIGN KEY (item_id) REFERENCES itens_cende(id) ON DELETE CASCADE,
-            FOREIGN KEY (tipo_movimentacao_id) REFERENCES tipos_movimentacao(id)
-        )
-    """)
-
-    # 7. Tabela de Usuários
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             email TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            reset_token TEXT,
-            reset_expiry TIMESTAMP
+            password_hash TEXT NOT NULL
         )
-    """)
-
-    # INSERÇÃO DE DADOS PADRÃO
-    cursor.execute("SELECT COUNT(*) FROM itens_cende")
-    if cursor.fetchone()[0] == 0:
-        cursor.executemany("INSERT INTO itens_cende (nome) VALUES (?)", [("Item de bens da CENDE",)])
+        """
+    )
 
     cursor.execute("SELECT COUNT(*) FROM armarios")
     if cursor.fetchone()[0] == 0:
         armarios_iniciais = [
-            ("Armário 1",), ("Armário 2",), ("Armário 3",),
-            ("Armário A",), ("Armário B",), ("Armário C",)
+            ("Armário 1",),
+            ("Armário 2",),
+            ("Armário 3",),
+            ("Armário A",),
+            ("Armário B",),
+            ("Armário C",),
         ]
         cursor.executemany("INSERT INTO armarios (nome) VALUES (?)", armarios_iniciais)
 
-    cursor.execute("SELECT COUNT(*) FROM tipos_movimentacao")
-    if cursor.fetchone()[0] == 0:
-        cursor.executemany("INSERT INTO tipos_movimentacao (nome, tipo) VALUES (?, ?)", [
-            ("Entrada / Cadastro", "ENTRADA"),
-            ("Saída / Empréstimo", "SAIDA"),
-            ("Devolução", "ENTRADA"),
-            ("Ajuste de Inventário (Positivo)", "ENTRADA"),
-            ("Ajuste de Inventário (Negativo)", "SAIDA")
-        ])
-
     conexao.commit()
     conexao.close()
-    print("Banco de dados criado com sucesso!")
-
-
-def adicionar_item_ao_armario(nome_armario, nome_item):
-    if not nome_armario:
-        return True, "Item cadastrado sem vínculo a armários."
-
-    conexao = sqlite3.connect("estoque.db")
-    cursor = conexao.cursor()
-    try:
-        cursor.execute("SELECT id FROM armarios WHERE nome = ?", (nome_armario,))
-        resultado = cursor.fetchone()
-        if not resultado:
-            return False, f"Armário '{nome_armario}' não encontrado."
-
-        armario_id = resultado[0]
-        cursor.execute("""
-            INSERT INTO itens_armario (armario_id, nome_item)
-            VALUES (?, ?)
-        """, (armario_id, nome_item))
-
-        conexao.commit()
-        return True, f"Item '{nome_item}' adicionado ao {nome_armario} com sucesso!"
-    except Exception as e:
-        conexao.rollback()
-        return False, str(e)
-    finally:
-        conexao.close()
 
 
 def _hash_password(password: str, salt: bytes = None) -> str:
@@ -147,22 +86,6 @@ def _verify_password(stored_hash: str, password: str) -> bool:
         return False
 
 
-def criar_usuario(username: str, email: str, password: str):
-    conexao = sqlite3.connect("estoque.db")
-    cursor = conexao.cursor()
-    try:
-        password_hash = _hash_password(password)
-        cursor.execute("INSERT INTO usuarios (username, email, password_hash) VALUES (?, ?, ?)",
-                       (username, email, password_hash))
-        conexao.commit()
-        return True, "Usuário criado com sucesso"
-    except Exception as e:
-        conexao.rollback()
-        return False, str(e)
-    finally:
-        conexao.close()
-
-
 def verificar_credenciais(username: str, password: str) -> bool:
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
@@ -176,104 +99,49 @@ def verificar_credenciais(username: str, password: str) -> bool:
         conexao.close()
 
 
-def get_user_by_email(email: str):
+def criar_usuario(username: str, email: str, password: str):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
-        cursor.execute("SELECT id, username, email FROM usuarios WHERE email = ?", (email,))
-        return cursor.fetchone()
-    finally:
-        conexao.close()
-
-
-def gerar_token_redefinicao(email: str) ->  tuple[bool, str]:
-    user = get_user_by_email(email)
-    if not user:
-        return False, "Email não cadastrado"
-
-    token = binascii.hexlify(os.urandom(16)).decode()
-    expiry = datetime.utcnow() + timedelta(hours=1)
-
-    conexao = sqlite3.connect("estoque.db")
-    cursor = conexao.cursor()
-    try:
-        cursor.execute("UPDATE usuarios SET reset_token = ?, reset_expiry = ? WHERE email = ?",
-                       (token, expiry.isoformat(), email))
+        password_hash = _hash_password(password)
+        cursor.execute(
+            "INSERT INTO usuarios (username, email, password_hash) VALUES (?, ?, ?)",
+            (username, email, password_hash),
+        )
         conexao.commit()
-        return True, token
+        return True, "Usuário criado com sucesso!"
+    except sqlite3.IntegrityError:
+        return False, "Nome de usuário ou email já existe."
     except Exception as e:
-        conexao.rollback()
         return False, str(e)
     finally:
         conexao.close()
 
 
-def redefinir_senha(token: str, nova_senha: str) -> tuple[bool, str]:
+def listar_itens_cende():
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
-    try:
-        cursor.execute("SELECT id, reset_expiry FROM usuarios WHERE reset_token = ?", (token,))
-        row = cursor.fetchone()
-        if not row:
-            return False, "Token inválido"
-
-        expiry = row[1]
-        if expiry is None or datetime.fromisoformat(expiry) < datetime.utcnow():
-            return False, "Token expirado"
-
-        password_hash = _hash_password(nova_senha)
-        cursor.execute("UPDATE usuarios SET password_hash = ?, reset_token = NULL, reset_expiry = NULL WHERE id = ?",
-                       (password_hash, row[0]))
-        conexao.commit()
-        return True, "Senha redefinida com sucesso"
-    except Exception as e:
-        conexao.rollback()
-        return False, str(e)
-    finally:
-        conexao.close()
-
-
-def listar_itens_do_armario(nome_armario):
-    conexao = sqlite3.connect("estoque.db")
-    cursor = conexao.cursor()
-    cursor.execute("""
-        SELECT ia.nome_item 
-        FROM itens_armario ia
-        JOIN armarios a ON ia.armario_id = a.id
-        WHERE a.nome = ?
-    """, (nome_armario,))
+    cursor.execute(
+        "SELECT id, nome, descricao, patrimonio_pertence, numero_protocolo_plaqueta, local, status FROM itens_cende"
+    )
     itens = cursor.fetchall()
     conexao.close()
-    return [item[0] for item in itens]
+    return itens
 
 
-def registrar_movimentacao_db(item_id, tipo_movimentacao_id, quantidade, observacao=""):
+def inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
-        cursor.execute("SELECT tipo FROM tipos_movimentacao WHERE id = ?", (tipo_movimentacao_id,))
-        resultado = cursor.fetchone()
-        if not resultado:
-            raise ValueError("Tipo de movimentação inválido.")
-        
-        tipo = resultado[0]
-
-        cursor.execute("""
-            INSERT INTO movimentacoes (item_id, tipo_movimentacao_id, quantidade, observacao)
-            VALUES (?, ?, ?, ?)
-        """, (item_id, tipo_movimentacao_id, quantidade, observacao))
-
-        if tipo == 'ENTRADA':
-            cursor.execute("""
-                UPDATE itens_cende SET quantidade_atual = quantidade_atual + ? WHERE id = ?
-            """, (quantidade, item_id))
-        elif tipo == 'SAIDA':
-            cursor.execute("""
-                UPDATE itens_cende SET quantidade_atual = quantidade_atual - ? WHERE id = ?
-            """, (quantidade, item_id))
-
+        cursor.execute(
+            """
+            INSERT INTO itens_cende (nome, descricao, patrimonio_pertence, numero_protocolo_plaqueta, local, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (nome, descricao, patrimonio, plaqueta, local, status),
+        )
         conexao.commit()
-        return True, "Movimentação registrada com sucesso!"
+        return True, "Item cadastrado com sucesso!"
     except Exception as e:
         conexao.rollback()
         return False, str(e)
@@ -281,78 +149,45 @@ def registrar_movimentacao_db(item_id, tipo_movimentacao_id, quantidade, observa
         conexao.close()
 
 
-def excluir_item_db(item_id: int):
-    """Remove um item da tabela itens_cende e seus registros associados."""
-    conexao = sqlite3.connect("estoque.db")
-    cursor = conexao.cursor()
-    try:
-        cursor.execute("SELECT nome FROM itens_cende WHERE id = ?", (item_id,))
-        item = cursor.fetchone()
-        
-        if item:
-            nome_item = item[0]
-            cursor.execute("DELETE FROM itens_armario WHERE nome_item = ?", (nome_item,))
-
-        cursor.execute("DELETE FROM movimentacoes WHERE item_id = ?", (item_id,))
-        cursor.execute("DELETE FROM itens_cende WHERE id = ?", (item_id,))
-        
-        conexao.commit()
-        return True, "Item excluído com sucesso!"
-    except Exception as e:
-        conexao.rollback()
-        return False, str(e)
-    finally:
-        conexao.close()
-
-
-
-def direto_no_armario(armario_id, nome_item):
-    conexao = sqlite3.connect("estoque.db")
-    cursor = conexao.cursor()
-    try:
-        cursor.execute("""INSERT INTO itens_armario (armario_id, nome_item) VALUES (?, ?)""", (armario_id, nome_item))
-        conexao.commit()
-        return True, "Item adicionado ao armário com sucesso!"
-    except Exception as e:
-        conexao.rollback()
-        return False, str(e)
-    finally:
-        conexao.close()
-
-def remover_item_do_armario(item_armario_id: int):
-    """remove um item exclusivo da lista de armarios que voce ja cadastrou."""
-    conexao = sqlite3.connect("estoque.db") 
-    cursor  = conexao.cursor()
-    try:
-        cursor.execute("DELETE FROM itens_armario WHERE id = ?", (item_armario_id,))
-        conexao.commit()
-        return True, "Item removido do armário com sucesso!"
-    except Exception as e:
-        conexao.rollback()
-        return False, str(e)
-    finally:
-        conexao.close()
-# onde da pra editar os itens da tabela 
-def ediçao_de_itens(item_id:int,coluna:str,valor):
-    colunas_permitidas ={
-        "nome":"nome",
-        "descricao":"descricao",
-        "quantidade_atual":"quantidade_atual",
-        "patrimonio_pertence":"patrimonio_pertence",
-        "numero_protocolo_plaqueta":"numero_protocolo_plaqueta",
-        "local":"local",
-        "status":"status"
+def atualizar_item_por_coluna(item_id: int, coluna: str, valor):
+    colunas_permitidas = {
+        "nome": "nome",
+        "descricao": "descricao",
+        "patrimonio": "patrimonio_pertence",
+        "plaqueta": "numero_protocolo_plaqueta",
+        "local": "local",
+        "status": "status",
     }
 
     if coluna not in colunas_permitidas:
-        return False, "Coluna inválida para edição."
-    nome_coluna_db = colunas_permitidas[coluna]
+        return False, "Coluna inválida."
 
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
-        query = f"UPDATE itens_cende SET {nome_coluna_db} = ? WHERE id = ?"
-        cursor.execute(query, (valor,item_id))
+        query = f"UPDATE itens_cende SET {colunas_permitidas[coluna]} = ? WHERE id = ?"
+        cursor.execute(query, (valor, item_id))
+        conexao.commit()
+        return True, "Atualizado com sucesso!"
+    except Exception as e:
+        conexao.rollback()
+        return False, str(e)
+    finally:
+        conexao.close()
+
+
+def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status):
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE itens_cende
+            SET nome = ?, descricao = ?, patrimonio_pertence = ?, numero_protocolo_plaqueta = ?, local = ?, status = ?
+            WHERE id = ?
+            """,
+            (nome, descricao, patrimonio, plaqueta, local, status, item_id),
+        )
         conexao.commit()
         return True, "Item atualizado com sucesso!"
     except Exception as e:
@@ -362,21 +197,95 @@ def ediçao_de_itens(item_id:int,coluna:str,valor):
         conexao.close()
 
 
-def atualizar_dentro_dos_armarios(item_armario_id: int, novo_nome:str):
+def excluir_item_db(item_id: int):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
-        cursor.execute("""UPDATE itens_armario SET nome_item =? WHERE id =?""", (novo_nome, item_armario_id))
+        cursor.execute("DELETE FROM itens_cende WHERE id = ?", (item_id,))
         conexao.commit()
-        return True , "Item do armáro arualizado com sucesso!"
+        return True, "Item excluído com sucesso!"
     except Exception as e:
+        conexao.rollback()
         return False, str(e)
     finally:
         conexao.close()
-     
-# Compatibilidade com versões anteriores que ainda chamavam o nome com typo.
-direto_no_aramrio = direto_no_armario
 
 
-if __name__ == "__main__":
-    criar_banco()
+def listar_armarios_com_itens():
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    cursor.execute(
+        """
+        SELECT a.id, a.nome, ia.id, ia.nome_item
+        FROM armarios AS a
+        LEFT JOIN itens_armario AS ia ON ia.armario_id = a.id
+        ORDER BY a.id, ia.id
+        """
+    )
+
+    armarios = {}
+    for armario_id, nome, item_id, nome_item in cursor.fetchall():
+        if armario_id not in armarios:
+            armarios[armario_id] = {"id": armario_id, "nome": nome, "itens": []}
+        if item_id is not None:
+            armarios[armario_id]["itens"].append({"id": item_id, "nome": nome_item})
+
+    conexao.close()
+    return list(armarios.values())
+
+
+def inserir_item_armario(armario_id: int, nome_item: str):
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    try:
+        cursor.execute("SELECT id FROM armarios WHERE id = ?", (armario_id,))
+        if cursor.fetchone() is None:
+            return False, "Armário não encontrado."
+
+        cursor.execute(
+            "INSERT INTO itens_armario (armario_id, nome_item) VALUES (?, ?)",
+            (armario_id, nome_item),
+        )
+        conexao.commit()
+        return True, "Item adicionado ao armário."
+    except Exception as e:
+        conexao.rollback()
+        return False, str(e)
+    finally:
+        conexao.close()
+
+
+def excluir_item_armario(item_id: int):
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    try:
+        cursor.execute("DELETE FROM itens_armario WHERE id = ?", (item_id,))
+        conexao.commit()
+        return True, "Item removido do armário."
+    except Exception as e:
+        conexao.rollback()
+        return False, str(e)
+    finally:
+        conexao.close()
+
+def pesquisar_item(termo):
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    padrao = f"%{termo}%"
+    cursor.execute(
+        """
+        SELECT id, nome, descricao, patrimonio_pertence,
+               numero_protocolo_plaqueta, local, status
+        FROM itens_cende
+        WHERE nome LIKE ?
+           OR descricao LIKE ?
+           OR patrimonio_pertence LIKE ?
+           OR numero_protocolo_plaqueta LIKE ?
+           OR local LIKE ?
+           OR status LIKE ?
+        """,
+        (padrao, padrao, padrao, padrao, padrao, padrao),
+    )
+    itens = cursor.fetchall()
+    conexao.close()
+    return itens
