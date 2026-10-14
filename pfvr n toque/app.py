@@ -13,8 +13,11 @@ from database import (
     atualizar_item_por_coluna,
     listar_armarios_com_itens,
     inserir_item_armario,
+    atualizar_item_armario,
     excluir_item_armario,
-    pesquisar_item
+    pesquisar_item,
+    listar_valores_atributo,
+    listar_itens_por_atributo,
 )
 #onde eu vou colocar as imagens 
 app = Flask(__name__)
@@ -106,6 +109,30 @@ def armarios_page():
     return render_template('armarios.html', armarios=armarios, usuario=session['usuario'])
 
 
+@app.route('/relatorio')
+def relatorio():
+    if 'usuario' not in session:
+        return redirect(url_for('login_page'))
+
+    atributos = {'nome': 'Nome', 'local': 'Local', 'status': 'Status'}
+    atributo = request.args.get('atributo', 'local')
+    if atributo not in atributos:
+        atributo = 'local'
+
+    valores = listar_valores_atributo(atributo)
+    valor = request.args.get('valor', '')
+    itens = listar_itens_por_atributo(atributo, valor) if valor in valores else []
+    return render_template(
+        'relatorio.html',
+        atributos=atributos,
+        atributo=atributo,
+        valores=valores,
+        valor=valor,
+        itens=itens,
+        usuario=session['usuario'],
+    )
+
+
 @app.route('/item/novo', methods=['POST'])
 def novo_item():
     if 'usuario' not in session:
@@ -184,14 +211,34 @@ def novo_item_armario(armario_id):
         return redirect(url_for('login_page'))
 
     nome_item = request.form.get('nome_item', '').strip()
+    protocolo = request.form.get('protocolo', '').strip()
     arquivo = request.files.get('imagem')
     nome_imagem = None
     if arquivo and arquivo.filename and allowed_file(arquivo.filename):
         nome_imagem = secure_filename(arquivo.filename)
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
 
-    if nome_item:
-        inserir_item_armario(armario_id, nome_item, nome_imagem)
+    if nome_item and protocolo:
+        inserir_item_armario(armario_id, nome_item, nome_imagem, protocolo)
+    return redirect(url_for('armarios_page'))
+
+
+@app.route('/armario/item/editar/<int:item_id>', methods=['POST'])
+def editar_item_armario_rota(item_id):
+    if 'usuario' not in session:
+        return redirect(url_for('login_page'))
+
+    nome_item = request.form.get('nome_item', '').strip()
+    protocolo_item = request.form.get('protocolo_item', '').strip()
+    arquivo = request.files.get('imagem')
+    nome_imagem = None
+    if arquivo and arquivo.filename and allowed_file(arquivo.filename):
+        nome_imagem = secure_filename(arquivo.filename)
+        arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
+
+    sucesso, mensagem = atualizar_item_armario(item_id, nome_item, protocolo_item, nome_imagem)
+    if not sucesso:
+        return redirect(url_for('armarios_page'))
     return redirect(url_for('armarios_page'))
 
 
@@ -202,7 +249,6 @@ def excluir_item_armario_rota(item_id):
 
     excluir_item_armario(item_id)
     return redirect(url_for('armarios_page'))
-
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard - Estoque do CENDE</title>
+    <title>Estoque do CENDE</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         body { display: block; padding: 2rem; background: #fff; color: #333; }
@@ -46,6 +46,7 @@
     <div class="header-bar">
         <h1>Estoque de Itens - CENDE (Usuário: <b>{{ usuario }}</b>)</h1>
         <div>
+            <a href="{{ url_for('relatorio') }}" style="margin-right: 1rem; color: #2563eb; font-weight: bold; text-decoration: none;">Relatórios</a>
             <a href="{{ url_for('armarios_page') }}" style="margin-right: 1rem; color: #2563eb; font-weight: bold; text-decoration: none;">Armários</a>
             <a href="{{ url_for('logout') }}" style="color: #d9534f; font-weight: bold; text-decoration: none;">Sair do Sistema</a>
         </div>
@@ -132,12 +133,14 @@
                         </div>
                     {% endif %}
                 </td>
-                <td class="acoes">
+                <td>
                     <form id="editar-item-{{ item[0] }}" class="form-editar" action="{{ url_for('editar_item', item_id=item[0]) }}" method="post" enctype="multipart/form-data"></form>
-                    <button form="editar-item-{{ item[0] }}" type="submit" class="btn-primary">Salvar</button>
-                    <form action="/item/excluir/{{ item[0] }}" method="post" onsubmit="return confirm('Deseja realmente excluir este item?');" style="display:inline;">
-                        <button type="submit" class="btn-danger">Excluir</button>
-                    </form>
+                    <div class="acoes">
+                        <button form="editar-item-{{ item[0] }}" type="submit" class="btn-primary">Salvar</button>
+                        <form action="/item/excluir/{{ item[0] }}" method="post" onsubmit="return confirm('Deseja realmente excluir este item?');" style="display:inline;">
+                            <button type="submit" class="btn-danger">Excluir</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             {% endfor %}

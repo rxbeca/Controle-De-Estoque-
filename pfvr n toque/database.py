@@ -34,10 +34,19 @@ def criar_banco():
         CREATE TABLE IF NOT EXISTS armarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
-            imagem TEXT
+            imagem TEXT,
+            protocolo TEXT DEFAULT ''
         )
         """
     )
+
+    colunas_armarios = {
+        coluna[1] for coluna in cursor.execute("PRAGMA table_info(armarios)").fetchall()
+    }
+    if "imagem" not in colunas_armarios:
+        cursor.execute("ALTER TABLE armarios ADD COLUMN imagem TEXT")
+    if "protocolo" not in colunas_armarios:
+        cursor.execute("ALTER TABLE armarios ADD COLUMN protocolo TEXT DEFAULT ''")
 
     cursor.execute(
         """
@@ -46,6 +55,7 @@ def criar_banco():
             armario_id INTEGER NOT NULL,
             nome_item TEXT NOT NULL,
             imagem TEXT,
+            protocolo INT DEFAULT 0,
             FOREIGN KEY (armario_id) REFERENCES armarios(id)
         )
         """
@@ -56,6 +66,8 @@ def criar_banco():
     }
     if "imagem" not in colunas_itens_armario:
         cursor.execute("ALTER TABLE itens_armario ADD COLUMN imagem TEXT")
+    if "protocolo" not in colunas_itens_armario:
+        cursor.execute("ALTER TABLE itens_armario ADD COLUMN protocolo TEXT DEFAULT ''")
 
     cursor.execute(
         """
@@ -71,14 +83,14 @@ def criar_banco():
     cursor.execute("SELECT COUNT(*) FROM armarios")
     if cursor.fetchone()[0] == 0:
         armarios_iniciais = [
-            ("Armário 1",),
-            ("Armário 2",),
-            ("Armário 3",),
-            ("Armário A",),
-            ("Armário B",),
-            ("Armário C",),
+            ("Armário 1", ""),
+            ("Armário 2", ""),
+            ("Armário 3", ""),
+            ("Armário A", ""),
+            ("Armário B", ""),
+            ("Armário C", ""),
         ]
-        cursor.executemany("INSERT INTO armarios (nome) VALUES (?)", armarios_iniciais)
+        cursor.executemany("INSERT INTO armarios (nome, protocolo) VALUES (?, ?)", armarios_iniciais)
 
     conexao.commit()
     conexao.close()
@@ -192,7 +204,7 @@ def atualizar_item_por_coluna(item_id: int, coluna: str, valor):
         conexao.close()
 
 
-def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, imagem):
+def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, imagem,protocolo, itens_armarios=None):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
@@ -204,6 +216,17 @@ def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, statu
             """,
             (nome, descricao, patrimonio, plaqueta, local, status, imagem, item_id),
         )
+
+        if itens_armarios is not None:
+            cursor.execute(
+                """
+                UPDATE itens_armario
+                SET nome_item = ?, protocolo_item = ?, imagem = COALESCE(?, imagem)
+                WHERE id = ?
+                """,
+                (nome, protocolo, imagem, itens_armarios),
+            )
+
         conexao.commit()
         return True, "Item atualizado com sucesso!"
     except Exception as e:
@@ -232,7 +255,7 @@ def listar_armarios_com_itens():
     cursor = conexao.cursor()
     cursor.execute(
         """
-        SELECT a.id, a.nome, ia.id, ia.nome_item, ia.imagem
+        SELECT a.id, a.nome, ia.id, ia.nome_item, ia.imagem, ia.protocolo
         FROM armarios AS a
         LEFT JOIN itens_armario AS ia ON ia.armario_id = a.id
         ORDER BY a.id, ia.id
@@ -240,19 +263,26 @@ def listar_armarios_com_itens():
     )
 
     armarios = {}
-    for armario_id, nome, item_id, nome_item, imagem in cursor.fetchall():
+    for armario_id, nome, item_id, nome_item, imagem, protocolo in cursor.fetchall():
         if armario_id not in armarios:
             armarios[armario_id] = {"id": armario_id, "nome": nome, "itens": []}
         if item_id is not None:
             armarios[armario_id]["itens"].append(
-                {"id": item_id, "nome": nome_item, "imagem": imagem}
+                {"id": item_id, "nome": nome_item, "imagem": imagem, "protocolo": protocolo}
             )
 
     conexao.close()
     return list(armarios.values())
 
 
-def inserir_item_armario(armario_id: int, nome_item: str, imagem=None):
+def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo: str = ""):
+    nome_item = (nome_item or "").strip()
+    protocolo = (protocolo or "").strip()
+    if not nome_item:
+        return False, "Nome do item é obrigatório."
+    if not protocolo:
+        return False, "Protocolo é obrigatório."
+
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
@@ -261,11 +291,33 @@ def inserir_item_armario(armario_id: int, nome_item: str, imagem=None):
             return False, "Armário não encontrado."
 
         cursor.execute(
-            "INSERT INTO itens_armario (armario_id, nome_item, imagem) VALUES (?, ?, ?)",
-            (armario_id, nome_item, imagem),
+            "INSERT INTO itens_armario (armario_id, nome_item, imagem, protocolo) VALUES (?, ?, ?, ?)",
+            (armario_id, nome_item, imagem, protocolo),
         )
         conexao.commit()
         return True, "Item adicionado ao armário."
+    except Exception as e:
+        conexao.rollback()
+        return False, str(e)
+    finally:
+        conexao.close()
+
+
+def atualizar_item_armario(item_id: int, nome_item: str, protocolo: str, imagem=None):
+    if not nome_item or not nome_item.strip():
+        return False, "Nome do item é obrigatório."
+    if not protocolo or not protocolo.strip():
+        return False, "Protocolo é obrigatório."
+
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    try:
+        cursor.execute(
+            "UPDATE itens_armario SET nome_item = ?, protocolo = ?, imagem = COALESCE(?, imagem) WHERE id = ?",
+            (nome_item.strip(), protocolo.strip(), imagem, item_id),
+        )
+        conexao.commit()
+        return True, "Item atualizado com sucesso."
     except Exception as e:
         conexao.rollback()
         return False, str(e)
@@ -287,22 +339,67 @@ def excluir_item_armario(item_id: int):
         conexao.close()
 
 def pesquisar_item(termo):
+    termo = (termo or '').strip()
+    if not termo:
+        return listar_itens_cende()
+
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     padrao = f"%{termo}%"
     cursor.execute(
         """
          SELECT id, nome, descricao, patrimonio_pertence,
-             numero_protocolo_plaqueta, local, status, imagem
-        FROM itens_cende
-        WHERE nome LIKE ?
-           OR descricao LIKE ?
-           OR patrimonio_pertence LIKE ?
-           OR numero_protocolo_plaqueta LIKE ?
-           OR local LIKE ?
-           OR status LIKE ?
+                numero_protocolo_plaqueta, local, status, imagem
+         FROM itens_cende
+         WHERE TRIM(COALESCE(nome, '')) LIKE ?
+            OR TRIM(COALESCE(descricao, '')) LIKE ?
+            OR TRIM(COALESCE(patrimonio_pertence, '')) LIKE ?
+            OR TRIM(COALESCE(numero_protocolo_plaqueta, '')) LIKE ?
+            OR TRIM(COALESCE(local, '')) LIKE ?
+            OR TRIM(COALESCE(status, '')) LIKE ?
+         ORDER BY nome COLLATE NOCASE
         """,
         (padrao, padrao, padrao, padrao, padrao, padrao),
+    )
+    itens = cursor.fetchall()
+    conexao.close()
+    return itens
+
+
+def listar_valores_atributo(atributo):
+    colunas_permitidas = {"nome": "Nome", "local": "Local", "status": "Status"}
+    coluna = colunas_permitidas.get(atributo)
+    if coluna is None:
+        return []
+
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    cursor.execute(
+        f"SELECT DISTINCT TRIM({coluna}) FROM itens_cende "
+        f"WHERE TRIM({coluna}) <> '' ORDER BY TRIM({coluna}) COLLATE NOCASE"
+    )
+    valores = [linha[0] for linha in cursor.fetchall()]
+    conexao.close()
+    return valores
+
+
+def listar_itens_por_atributo(atributo, valor):
+    colunas_permitidas = {"nome": "Nome", "local": "Local", "status": "Status"}
+    coluna = colunas_permitidas.get(atributo)
+    if coluna is None:
+        return []
+
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    cursor.execute(
+        f"""
+        SELECT id, nome, descricao, patrimonio_pertence,
+               numero_protocolo_plaqueta, local, status, imagem
+        FROM itens_cende
+        WHERE TRIM({coluna}) = TRIM(?) COLLATE NOCASE
+        ORDER BY nome COLLATE NOCASE
+        """,
+        (valor,),
     )
     itens = cursor.fetchall()
     conexao.close()

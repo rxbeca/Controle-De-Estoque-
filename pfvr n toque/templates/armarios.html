@@ -12,27 +12,34 @@
         .header-links a { font-weight: bold; text-decoration: none; }
         .dashboard-link { color: #2563eb; }
         .logout-link { color: #d9534f; }
-        .armarios-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
-        .armario-card { background: #fff; padding: 1.25rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .armario-card h2 { margin-top: 0; margin-bottom: 1rem; color: #2563eb; }
-        .armario-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-bottom: 1rem; align-items: end; }
-        .armario-form > input { min-width: 0; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .foto-field { display: flex; grid-column: 1 / -1; flex-direction: column; gap: 4px; color: #475569; font-size: 0.85rem; font-weight: bold; }
-        .foto-field input { width: 100%; min-width: 0; padding: 5px; background: #f8fafc; }
-        .item-foto { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #dbe3ef; vertical-align: middle; }
+        .armarios-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+        .armario-card { background: #fff; padding: 0.8rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .armario-card h2 { margin-top: 0; margin-bottom: 0.6rem; color: #2563eb; }
+        .armario-form { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; align-items: end; }
+        .armario-form input { flex: 150px; min-width: 0; padding: 6px 7px; border: 1px solid #ccc; border-radius: 4px; }
+        .armario-form button { flex-shrink: 0; padding: 6px 10px; }
+        .foto-field { display: flex; flex-direction: column; gap: 2px; color: #475569; font-size: 0.62rem; font-weight: bold; flex: 1 1 180px; min-width: 0; }
+        .foto-field input { width: 100%; min-width: 0; padding: 2px 4px; background: #f8fafc; font-size: 0.68rem; height: 10px; }
+        .item-foto { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid #dbe3ef; vertical-align: middle; }
         .sem-foto { color: #94a3b8; font-size: 0.85rem; }
-        .btn-primary, .btn-danger { border: none; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+        .btn-primary, .btn-danger { border: none; color: white; padding: 7px 10px; border-radius: 4px; cursor: pointer; }
         .btn-primary { background: #2563eb; }
         .btn-danger { background: #d9534f; padding: 4px 8px; }
-        .armario-itens { padding-left: 1.25rem; margin: 0; }
-        .armario-item { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-        .armario-item form { flex-shrink: 0; }
+        .armario-itens { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .armario-itens th, .armario-itens td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e7e7e7; }
+        .armario-itens th { background: #2563eb; color: #fff; }
+        .armario-itens td input[type="text"] { width: 100%; min-width: 130px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .item-edit-form { display: flex; align-items: center; gap: 8px; }
+        .foto-editar { display: flex; align-items: center; gap: 8px; min-width: 150px; }
+        .foto-editar input { max-width: 190px; font-size: 0.8rem; }
+        .acoes { display: flex; gap: 8px; align-items: center; }
+        .inline-form { margin: 0; }
         .vazio { color: #666; }
         @media (max-width: 600px) {
             body { padding: 1rem; }
             .header-bar { align-items: flex-start; flex-direction: column; }
-            .armarios-grid { grid-template-columns: 1fr; }
-            .armario-form { grid-template-columns: 1fr; }
+            .armario-itens { display: block; overflow-x: auto; white-space: nowrap; }
+            .armario-form { flex-direction: column; align-items: stretch; }
             .armario-form button { width: 100%; }
         }
     </style>
@@ -46,56 +53,83 @@
         </div>
     </div>
     <div style="margin-bottom: 20px;">
-        <input type="text"
-        id="inputPesquisaGeral"
-        onkeyup="filtrarGeral()"
-        placeholder="Pesquisar item..."
-        style="width:100%; padding: 10px; font-size: 16px;"/>
+        <input type="text" id="inputPesquisaGeral" onkeyup="filtrarGeral()" placeholder="Pesquisar item..." style="width:100%; padding: 10px; font-size: 16px;"/>
     </div>
 
     <div class="armarios-grid">
         {% for armario in armarios %}
         <section class="armario-card">
             <h2>{{ armario.nome }}</h2>
+
             <form class="armario-form" action="{{ url_for('novo_item_armario', armario_id=armario.id) }}" method="post" enctype="multipart/form-data">
                 <input type="text" name="nome_item" placeholder="Nome do item" required>
-                <label class="foto-field">
-                    Foto (opcional)
+                 <input type="string" name="protocolo" placeholder="Digite o protocolo" required>
+                   Foto (opcional)
                     <input type="file" name="imagem" accept=".jpg,.jpeg,.png,.webp,.gif">
-                </label>
                 <button type="submit" class="btn-primary">Adicionar</button>
+                   
+                  
+               
             </form>
+
             {% if armario.itens %}
-            <ul class="armario-itens">
+            <table class="armario-itens">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Protocolo</th>
+                        <th>Foto</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
                 {% for item_armario in armario.itens %}
-                <li class="armario-item">
-                    <span>
+                <tr>
+                    <td>
+                        <form id="editar-item-{{ item_armario.id }}" class="item-edit-form" action="{{ url_for('editar_item_armario_rota', item_id=item_armario.id) }}" method="post" enctype="multipart/form-data">
+                            <input type="text" name="nome_item" value="{{ item_armario.nome }}" required>
+                            <input type="string" name="protocolo_item" value="{{ item_armario.protocolo }}" required>
+                        </form>
+                    </td>
+                    <td>
                         {% if item_armario.imagem %}
                             <img class="item-foto" src="{{ url_for('static', filename='upload/' ~ item_armario.imagem) }}" alt="Foto de {{ item_armario.nome }}">
+                        {% else %}
+                            <span class="sem-foto">Sem foto</span>
                         {% endif %}
-                        {{ item_armario.nome }}
-                    </span>
-                    <form action="{{ url_for('excluir_item_armario_rota', item_id=item_armario.id) }}" method="post">
-                        <button type="submit" class="btn-danger">Excluir</button>
-                    </form>
-                </li>
+                        <label class="foto-editar">
+                            <span class="sem-foto">Alterar</span>
+                            <input form="editar-item-{{ item_armario.id }}" type="file" name="imagem" accept=".jpg,.jpeg,.png,.webp,.gif" aria-label="Escolher foto para {{ item_armario.nome }}">
+                        </label>
+                    </td>
+                    <td>
+                        <div class="acoes">
+                            <button form="editar-item-{{ item_armario.id }}" type="submit" class="btn-primary">Salvar</button>
+                            <form class="inline-form" action="{{ url_for('excluir_item_armario_rota', item_id=item_armario.id) }}" method="post">
+                                <button type="submit" class="btn-danger">Excluir</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
                 {% endfor %}
-            </ul>
+                </tbody>
+            </table>
             {% else %}
             <p class="vazio">Nenhum item cadastrado.</p>
             {% endif %}
         </section>
         {% endfor %}
     </div>
-     <script>
-         function filtrarGeral(){
+
+    <script>
+        function filtrarGeral(){
             const filtro = document.getElementById("inputPesquisaGeral").value.toLowerCase();
             const armarios = document.querySelectorAll(".armario-card");
             armarios.forEach(armario => {
                 const texto = armario.textContent.toLowerCase();
                 armario.style.display = texto.includes(filtro) ? "" : "none";
             });
-         }
+        }
     </script>
 </body>
 </html>

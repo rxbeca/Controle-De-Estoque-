@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Relatório de itens - Estoque do CENDE</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 2rem; color: #263238; font-family: Cambria, Cochin, Georgia, 'Times New Roman', serif; }
+        .pagina { max-width: 1100px; margin: 0 auto; }
+        .topo, .filtros, .acoes { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+        .topo { margin-bottom: 1.5rem; }
+        .topo a { color: #2563eb; font-weight: bold; }
+        h1 { margin: 0; font-size: 1.8rem; }
+        .filtros { justify-content: flex-start; flex-wrap: wrap; padding: 1rem 0; border-top: 1px solid #d9e0e7; border-bottom: 1px solid #d9e0e7; }
+        label { display: grid; gap: 0.35rem; font-weight: bold; }
+        select, button { min-height: 40px; padding: 0.55rem 0.75rem; font: inherit; }
+        select { min-width: 190px; border: 1px solid #aeb9c4; border-radius: 4px; background: #fff; }
+        button { border: 0; border-radius: 4px; background: #2563eb; color: #fff; cursor: pointer; font-weight: bold; }
+        .acoes { justify-content: flex-start; margin: 1.25rem 0; }
+        .voltar { color: #2563eb; }
+        .resumo { margin: 1.5rem 0 0.75rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.7rem; border-bottom: 1px solid #d9e0e7; text-align: left; }
+        th { background: #2563eb; color: white; }
+        .vazio { padding: 1rem 0; color: #5b6570; }
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            .topo { align-items: flex-start; flex-direction: column; }
+            .filtros { align-items: stretch; flex-direction: column; }
+            select, .filtros button { width: 100%; }
+            table { display: block; overflow-x: auto; white-space: nowrap; }
+        }
+        @media print {
+            body { padding: 0; color: #000; }
+            .filtros, .acoes, .topo a { display: none !important; }
+            .topo { margin-bottom: 1rem; }
+            th { background: #e8edf2 !important; color: #000 !important; print-color-adjust: exact; }
+            tr { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <main class="pagina">
+        <header class="topo">
+            <h1>Relatório de itens</h1>
+            <a href="{{ url_for('dashboard') }}">Voltar ao estoque</a>
+        </header>
+
+        <form class="filtros" action="{{ url_for('relatorio') }}" method="get">
+            <label>
+                Agrupar por atributo
+                <select name="atributo" onchange="this.form.elements.valor.value = ''; this.form.submit()">
+                    {% for chave, nome in atributos.items() %}
+                        <option value="{{ chave }}" {% if atributo == chave %}selected{% endif %}>{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                Valor
+                <select name="valor" required>
+                    <option value="">Selecione...</option>
+                    {% for opcao in valores %}
+                        <option value="{{ opcao }}" {% if valor == opcao %}selected{% endif %}>{{ opcao }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit">Gerar lista</button>
+        </form>
+
+        {% if valor %}
+            <h2 class="resumo">{{ atributos[atributo] }}: {{ valor }} <small>({{ itens|length }} itens)</small></h2>
+            {% if itens %}
+                <div class="acoes">
+                    <button type="button" onclick="window.print()">Exportar para PDF</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>Nome</th><th>Descrição</th><th>Patrimônio</th><th>Plaqueta</th><th>Local</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in itens %}
+                            <tr>
+                                <td>{{ item[1] }}</td>
+                                <td>{{ item[2] }}</td>
+                                <td>{{ item[3] }}</td>
+                                <td>{{ item[4] }}</td>
+                                <td>{{ item[5]|trim }}</td>
+                                <td>{{ item[6] }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="vazio">Nenhum item encontrado para esse valor.</p>
+            {% endif %}
+        {% endif %}
+    </main>
+</body>
+</html>
