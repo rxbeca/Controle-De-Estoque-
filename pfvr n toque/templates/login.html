@@ -48,7 +48,10 @@
 
                     <div class="input-group-modern">
                         <label for="senha">Senha</label>
-                        <input type="password" name="senha" id="senha" placeholder="Digite sua senha" required>
+                        <div class="password-input-wrapper">
+                            <input type="password" name="senha" id="senha" placeholder="Digite sua senha" required>
+                            <button class="toggle-password" type="button" aria-label="Mostrar senha" aria-controls="senha" aria-pressed="false">Mostrar</button>
+                        </div>
                     </div>
 
                     <button type="submit" class="btn-submit-modern">Acessar Sistema</button>
@@ -71,12 +74,18 @@
 
                     <div class="input-group-modern">
                         <label for="nova_senha">Senha</label>
-                        <input type="password" id="nova_senha" name="nova_senha" placeholder="Digite uma senha" required>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="nova_senha" name="nova_senha" placeholder="Digite uma senha" required>
+                            <button class="toggle-password" type="button" aria-label="Mostrar senha" aria-controls="nova_senha" aria-pressed="false">Mostrar</button>
+                        </div>
                     </div>
 
                     <div class="input-group-modern">
                         <label for="confirma_senha">Confirmar senha</label>
-                        <input type="password" id="confirma_senha" name="confirma_senha" placeholder="Confirme a senha" required>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="confirma_senha" name="confirma_senha" placeholder="Confirme a senha" required>
+                            <button class="toggle-password" type="button" aria-label="Mostrar senha" aria-controls="confirma_senha" aria-pressed="false">Mostrar</button>
+                        </div>
                     </div>
 
                     <button type="submit" class="btn-submit-modern">Criar usuário</button>
@@ -87,6 +96,17 @@
                         e.preventDefault();
                         var f = document.getElementById('register-form');
                         f.style.display = (f.style.display === 'none' || f.style.display === '') ? 'block' : 'none';
+                    });
+
+                    document.querySelectorAll('.toggle-password').forEach(function(button){
+                        button.addEventListener('click', function(){
+                            var password = document.getElementById(button.getAttribute('aria-controls'));
+                            var showPassword = password.type === 'password';
+                            password.type = showPassword ? 'text' : 'password';
+                            button.textContent = showPassword ? 'Ocultar' : 'Mostrar';
+                            button.setAttribute('aria-label', showPassword ? 'Ocultar senha' : 'Mostrar senha');
+                            button.setAttribute('aria-pressed', String(showPassword));
+                        });
                     });
                 </script>
             </div>

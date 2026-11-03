@@ -12,7 +12,7 @@
         .topo { margin-bottom: 1.5rem; }
         .topo a { color: #2563eb; font-weight: bold; }
         h1 { margin: 0; font-size: 1.8rem; }
-        .filtros { justify-content: flex-start; flex-wrap: wrap; padding: 1rem 0; border-top: 1px solid #d9e0e7; border-bottom: 1px solid #d9e0e7; }
+        .filtros { justify-content: flex-start; flex-wrap: wrap; padding: 1rem 0; border-top: 10px solid #d9e0e7; border-bottom: 10px solid #d9e0e7; }
         label { display: grid; gap: 0.35rem; font-weight: bold; }
         select, button { min-height: 40px; padding: 0.55rem 0.75rem; font: inherit; }
         select { min-width: 190px; border: 1px solid #aeb9c4; border-radius: 4px; background: #fff; }
@@ -20,16 +20,18 @@
         .acoes { justify-content: flex-start; margin: 1.25rem 0; }
         .voltar { color: #2563eb; }
         .resumo { margin: 1.5rem 0 0.75rem; }
-        table { width: 100%; border-collapse: collapse; }
+        .tabela-container { width: 100%; overflow-x: auto; }
+        table { width: 100%; table-layout: fixed; border-collapse: collapse; }
         th, td { padding: 0.7rem; border-bottom: 1px solid #d9e0e7; text-align: left; }
+        th, td { overflow-wrap: anywhere; vertical-align: top; }
         th { background: #2563eb; color: white; }
         .vazio { padding: 1rem 0; color: #5b6570; }
-        @media (max-width: 600px) {
+        @media (max-width: 900px) {
             body { padding: 1rem; }
             .topo { align-items: flex-start; flex-direction: column; }
             .filtros { align-items: stretch; flex-direction: column; }
             select, .filtros button { width: 100%; }
-            table { display: block; overflow-x: auto; white-space: nowrap; }
+            table { min-width: 900px; }
         }
         @media print {
             body { padding: 0; color: #000; }
@@ -49,48 +51,49 @@
 
         <form class="filtros" action="{{ url_for('relatorio') }}" method="get">
             <label>
-                Agrupar por atributo
-                <select name="atributo" onchange="this.form.elements.valor.value = ''; this.form.submit()">
-                    {% for chave, nome in atributos.items() %}
-                        <option value="{{ chave }}" {% if atributo == chave %}selected{% endif %}>{{ nome }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>
-                Valor
-                <select name="valor" required>
-                    <option value="">Selecione...</option>
-                    {% for opcao in valores %}
-                        <option value="{{ opcao }}" {% if valor == opcao %}selected{% endif %}>{{ opcao }}</option>
-                    {% endfor %}
-                </select>
+                O que deseja procurar?
+                <input type="search" name="busca" value="{{ busca }}" placeholder="Ex.: móveis, cadeira, material" required>
             </label>
             <button type="submit">Gerar lista</button>
         </form>
 
-        {% if valor %}
-            <h2 class="resumo">{{ atributos[atributo] }}: {{ valor }} <small>({{ itens|length }} itens)</small></h2>
+        {% if busca %}
+            <h2 class="resumo">Resultados para: {{ busca }} <small>({{ itens|length }} itens)</small></h2>
             {% if itens %}
                 <div class="acoes">
                     <button type="button" onclick="window.print()">Exportar para PDF</button>
                 </div>
-                <table>
-                    <thead>
-                        <tr><th>Nome</th><th>Descrição</th><th>Patrimônio</th><th>Plaqueta</th><th>Local</th><th>Status</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for item in itens %}
-                            <tr>
-                                <td>{{ item[1] }}</td>
-                                <td>{{ item[2] }}</td>
-                                <td>{{ item[3] }}</td>
-                                <td>{{ item[4] }}</td>
-                                <td>{{ item[5]|trim }}</td>
-                                <td>{{ item[6] }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="tabela-container">
+                    <table>
+                        <colgroup>
+                            <col style="width: 15%">
+                            <col style="width: 15%">
+                            <col style="width: 12%">
+                            <col style="width: 12%">
+                            <col style="width: 14%">
+                            <col style="width: 12%">
+                            <col style="width: 10%">
+                            <col style="width: 10%">
+                        </colgroup>
+                        <thead>
+                            <tr><th>Nome</th><th>Descrição</th><th>Categoria</th><th>Patrimônio</th><th>Protocolo / Plaqueta</th><th>Local / Armário</th><th>Status</th><th>Origem</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for item in itens %}
+                                <tr>
+                                    <td>{{ item[0] }}</td>
+                                    <td>{{ item[1] }}</td>
+                                    <td>{{ item[2] }}</td>
+                                    <td>{{ item[3] }}</td>
+                                    <td>{{ item[4]|trim }}</td>
+                                    <td>{{ item[5] }}</td>
+                                    <td>{{ item[6] }}</td>
+                                    <td>{{ item[7] }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
                 <p class="vazio">Nenhum item encontrado para esse valor.</p>
             {% endif %}

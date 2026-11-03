@@ -25,20 +25,19 @@
         .btn-primary, .btn-danger { border: none; color: white; padding: 7px 10px; border-radius: 4px; cursor: pointer; }
         .btn-primary { background: #2563eb; }
         .btn-danger { background: #d9534f; padding: 4px 8px; }
-        .armario-itens { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .tabela-armario-container { width: 100%; overflow-x: auto; }
+        .armario-itens { width: 100%; min-width: 1000px; table-layout: fixed; border-collapse: collapse; background: #fff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .armario-itens th, .armario-itens td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e7e7e7; }
+        .armario-itens th, .armario-itens td { vertical-align: middle; overflow-wrap: anywhere; }
         .armario-itens th { background: #2563eb; color: #fff; }
-        .armario-itens td input[type="text"] { width: 100%; min-width: 130px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .item-edit-form { display: flex; align-items: center; gap: 8px; }
-        .foto-editar { display: flex; align-items: center; gap: 8px; min-width: 150px; }
-        .foto-editar input { max-width: 190px; font-size: 0.8rem; }
-        .acoes { display: flex; gap: 8px; align-items: center; }
-        .inline-form { margin: 0; }
+        .armario-itens td input[type="text"] { display: block; width: 100%; min-width: 0; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .foto-editar { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+        .foto-editar input { width: 100%; min-width: 0; font-size: 0.8rem; }
+        .acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .vazio { color: #666; }
         @media (max-width: 600px) {
             body { padding: 1rem; }
             .header-bar { align-items: flex-start; flex-direction: column; }
-            .armario-itens { display: block; overflow-x: auto; white-space: nowrap; }
             .armario-form { flex-direction: column; align-items: stretch; }
             .armario-form button { width: 100%; }
         }
@@ -63,6 +62,7 @@
 
             <form class="armario-form" action="{{ url_for('novo_item_armario', armario_id=armario.id) }}" method="post" enctype="multipart/form-data">
                 <input type="text" name="nome_item" placeholder="Nome do item" required>
+                <input type="text" name="categoria" placeholder="Categoria (ex.: Móveis)">
                  <input type="string" name="protocolo" placeholder="Digite o protocolo" required>
                    Foto (opcional)
                     <input type="file" name="imagem" accept=".jpg,.jpeg,.png,.webp,.gif">
@@ -73,10 +73,23 @@
             </form>
 
             {% if armario.itens %}
+            <div class="tabela-armario-container">
+            {% for item_armario in armario.itens %}
+                <form id="editar-item-{{ item_armario.id }}" action="{{ url_for('editar_item_armario_rota', item_id=item_armario.id) }}" method="post" enctype="multipart/form-data"></form>
+                <form id="excluir-item-{{ item_armario.id }}" action="{{ url_for('excluir_item_armario_rota', item_id=item_armario.id) }}" method="post"></form>
+            {% endfor %}
             <table class="armario-itens">
+                <colgroup>
+                    <col style="width: 24%">
+                    <col style="width: 18%">
+                    <col style="width: 18%">
+                    <col style="width: 23%">
+                    <col style="width: 17%">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>Nome</th>
+                        <th>Categoria</th>
                         <th>Protocolo</th>
                         <th>Foto</th>
                         <th>Ações</th>
@@ -86,10 +99,13 @@
                 {% for item_armario in armario.itens %}
                 <tr>
                     <td>
-                        <form id="editar-item-{{ item_armario.id }}" class="item-edit-form" action="{{ url_for('editar_item_armario_rota', item_id=item_armario.id) }}" method="post" enctype="multipart/form-data">
-                            <input type="text" name="nome_item" value="{{ item_armario.nome }}" required>
-                            <input type="string" name="protocolo_item" value="{{ item_armario.protocolo }}" required>
-                        </form>
+                        <input form="editar-item-{{ item_armario.id }}" type="text" name="nome_item" value="{{ item_armario.nome }}" required>
+                    </td>
+                    <td>
+                        <input form="editar-item-{{ item_armario.id }}" type="text" name="categoria" value="{{ item_armario.categoria }}" placeholder="Categoria">
+                    </td>
+                    <td>
+                        <input form="editar-item-{{ item_armario.id }}" type="text" name="protocolo_item" value="{{ item_armario.protocolo }}" required>
                     </td>
                     <td>
                         {% if item_armario.imagem %}
@@ -105,15 +121,14 @@
                     <td>
                         <div class="acoes">
                             <button form="editar-item-{{ item_armario.id }}" type="submit" class="btn-primary">Salvar</button>
-                            <form class="inline-form" action="{{ url_for('excluir_item_armario_rota', item_id=item_armario.id) }}" method="post">
-                                <button type="submit" class="btn-danger">Excluir</button>
-                            </form>
+                            <button form="excluir-item-{{ item_armario.id }}" type="submit" class="btn-danger">Excluir</button>
                         </div>
                     </td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
             {% else %}
             <p class="vazio">Nenhum item cadastrado.</p>
             {% endif %}
@@ -122,12 +137,26 @@
     </div>
 
     <script>
-        function filtrarGeral(){
-            const filtro = document.getElementById("inputPesquisaGeral").value.toLowerCase();
+        function filtrarGeral() {
+            const filtro = document.getElementById("inputPesquisaGeral").value.trim().toLowerCase();
             const armarios = document.querySelectorAll(".armario-card");
+
             armarios.forEach(armario => {
-                const texto = armario.textContent.toLowerCase();
-                armario.style.display = texto.includes(filtro) ? "" : "none";
+                const nomeArmario = armario.querySelector("h2").textContent.toLowerCase();
+                const linhas = armario.querySelectorAll(".armario-itens tbody tr");
+                let encontrou = !filtro || nomeArmario.includes(filtro);
+
+                linhas.forEach(linha => {
+                    const valores = Array.from(linha.querySelectorAll("input"))
+                        .map(input => input.value)
+                        .join(" ");
+                    const corresponde = !filtro || nomeArmario.includes(filtro)
+                        || `${linha.textContent} ${valores}`.toLowerCase().includes(filtro);
+                    linha.style.display = corresponde ? "" : "none";
+                    encontrou = encontrou || corresponde;
+                });
+
+                armario.style.display = encontrou ? "" : "none";
             });
         }
     </script>

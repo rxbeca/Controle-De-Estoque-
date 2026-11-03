@@ -16,8 +16,7 @@ from database import (
     atualizar_item_armario,
     excluir_item_armario,
     pesquisar_item,
-    listar_valores_atributo,
-    listar_itens_por_atributo,
+    pesquisar_itens_relatorio,
 )
 #onde eu vou colocar as imagens 
 app = Flask(__name__)
@@ -114,20 +113,11 @@ def relatorio():
     if 'usuario' not in session:
         return redirect(url_for('login_page'))
 
-    atributos = {'nome': 'Nome', 'local': 'Local', 'status': 'Status'}
-    atributo = request.args.get('atributo', 'local')
-    if atributo not in atributos:
-        atributo = 'local'
-
-    valores = listar_valores_atributo(atributo)
-    valor = request.args.get('valor', '')
-    itens = listar_itens_por_atributo(atributo, valor) if valor in valores else []
+    busca = request.args.get('busca', '').strip()
+    itens = pesquisar_itens_relatorio(busca)
     return render_template(
         'relatorio.html',
-        atributos=atributos,
-        atributo=atributo,
-        valores=valores,
-        valor=valor,
+        busca=busca,
         itens=itens,
         usuario=session['usuario'],
     )
@@ -144,6 +134,7 @@ def novo_item():
     plaqueta = request.form.get('plaqueta')
     local = request.form.get('local')
     status = request.form.get('status')
+    categoria = request.form.get('categoria', '').strip()
 
     imagem = request.files.get('imagem')
     nome_imagem = None
@@ -151,7 +142,7 @@ def novo_item():
         nome_imagem = secure_filename(imagem.filename)
         imagem.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
 
-    inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status, nome_imagem)
+    inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status, nome_imagem, categoria)
     return redirect(url_for('dashboard'))
 
 
@@ -175,6 +166,7 @@ def editar_item(item_id):
     plaqueta = request.form.get('plaqueta')
     local = request.form.get('local')
     status = request.form.get('status')
+    categoria = request.form.get('categoria', '').strip()
     imagem = request.files.get('imagem')
 
     nome_imagem = None
@@ -182,7 +174,7 @@ def editar_item(item_id):
         nome_imagem = secure_filename(imagem.filename)
         imagem.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
 
-    edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, nome_imagem)
+    edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, nome_imagem, categoria=categoria)
     return redirect(url_for('dashboard'))
 
 
@@ -212,6 +204,7 @@ def novo_item_armario(armario_id):
 
     nome_item = request.form.get('nome_item', '').strip()
     protocolo = request.form.get('protocolo', '').strip()
+    categoria = request.form.get('categoria', '').strip()
     arquivo = request.files.get('imagem')
     nome_imagem = None
     if arquivo and arquivo.filename and allowed_file(arquivo.filename):
@@ -219,7 +212,7 @@ def novo_item_armario(armario_id):
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
 
     if nome_item and protocolo:
-        inserir_item_armario(armario_id, nome_item, nome_imagem, protocolo)
+        inserir_item_armario(armario_id, nome_item, nome_imagem, protocolo, categoria)
     return redirect(url_for('armarios_page'))
 
 
@@ -230,13 +223,14 @@ def editar_item_armario_rota(item_id):
 
     nome_item = request.form.get('nome_item', '').strip()
     protocolo_item = request.form.get('protocolo_item', '').strip()
+    categoria = request.form.get('categoria', '').strip()
     arquivo = request.files.get('imagem')
     nome_imagem = None
     if arquivo and arquivo.filename and allowed_file(arquivo.filename):
         nome_imagem = secure_filename(arquivo.filename)
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
 
-    sucesso, mensagem = atualizar_item_armario(item_id, nome_item, protocolo_item, nome_imagem)
+    sucesso, mensagem = atualizar_item_armario(item_id, nome_item, protocolo_item, nome_imagem, categoria)
     if not sucesso:
         return redirect(url_for('armarios_page'))
     return redirect(url_for('armarios_page'))
@@ -252,4 +246,4 @@ def excluir_item_armario_rota(item_id):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run( host='0.0.0.0',debug=False, port=5001)

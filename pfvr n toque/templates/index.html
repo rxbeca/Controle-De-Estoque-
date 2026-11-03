@@ -57,6 +57,7 @@
         <form action="{{ url_for('novo_item') }}" method="post" enctype="multipart/form-data" style="margin-top: 10px;">
             <input type="text" name="nome" placeholder="Nome do Item" required>
             <input type="text" name="descricao" placeholder="Descrição" required>
+            <input type="text" name="categoria" placeholder="Categoria (ex.: Móveis)">
             <input type="text" name="patrimonio" placeholder="Patrimônio" required>
             <input type="text" name="plaqueta" placeholder="Nº Plaqueta" required>
             <input type="text" name="local" placeholder="Local" required>
@@ -94,6 +95,7 @@
             <tr>
                 <th>Nome</th>
                 <th>Descrição</th>
+                <th>Categoria</th>
                 <th>Patrimônio</th>
                 <th>Plaqueta</th>
                 <th>Local</th>
@@ -109,6 +111,7 @@
                     <input form="editar-item-{{ item[0] }}" type="text" name="nome" value="{{ item[1] }}" required>
                 </td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="descricao" value="{{ item[2] }}" required></td>
+                <td><input form="editar-item-{{ item[0] }}" type="text" name="categoria" value="{{ item[8] }}" placeholder="Categoria"></td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="patrimonio" value="{{ item[3] }}" required></td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="plaqueta" value="{{ item[4] }}" required></td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="local" value="{{ item[5] }}" required></td>

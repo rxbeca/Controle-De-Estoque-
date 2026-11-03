@@ -120,6 +120,34 @@ body {
     background-color: #ffffff;
 }
 
+.password-input-wrapper {
+    position: relative;
+}
+
+.password-input-wrapper input {
+    padding-right: 88px;
+}
+
+.toggle-password {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    border: 0;
+    padding: 4px;
+    background: transparent;
+    color: #2563eb;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.toggle-password:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
 .input-group-modern input:focus {
     border-color: #2563eb;
     background-color: #ffffff;

@@ -18,7 +18,8 @@ def criar_banco():
             numero_protocolo_plaqueta TEXT NOT NULL,
             local TEXT NOT NULL,
             status TEXT CHECK(status IN ('DISPONIVEL', 'EM_USO', 'MANUTENCAO', 'INDISPONIVEL')) DEFAULT 'DISPONIVEL',
-            imagem TEXT
+            imagem TEXT,
+            categoria TEXT DEFAULT ''
         )
         """
     )
@@ -28,6 +29,8 @@ def criar_banco():
     }
     if "imagem" not in colunas_itens:
         cursor.execute("ALTER TABLE itens_cende ADD COLUMN imagem TEXT")
+    if "categoria" not in colunas_itens:
+        cursor.execute("ALTER TABLE itens_cende ADD COLUMN categoria TEXT DEFAULT ''")
 
     cursor.execute(
         """
@@ -56,6 +59,7 @@ def criar_banco():
             nome_item TEXT NOT NULL,
             imagem TEXT,
             protocolo INT DEFAULT 0,
+            categoria TEXT DEFAULT '',
             FOREIGN KEY (armario_id) REFERENCES armarios(id)
         )
         """
@@ -68,6 +72,8 @@ def criar_banco():
         cursor.execute("ALTER TABLE itens_armario ADD COLUMN imagem TEXT")
     if "protocolo" not in colunas_itens_armario:
         cursor.execute("ALTER TABLE itens_armario ADD COLUMN protocolo TEXT DEFAULT ''")
+    if "categoria" not in colunas_itens_armario:
+        cursor.execute("ALTER TABLE itens_armario ADD COLUMN categoria TEXT DEFAULT ''")
 
     cursor.execute(
         """
@@ -149,23 +155,23 @@ def listar_itens_cende():
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     cursor.execute(
-        "SELECT id, nome, descricao, patrimonio_pertence, numero_protocolo_plaqueta, local, status, imagem FROM itens_cende"
+        "SELECT id, nome, descricao, patrimonio_pertence, numero_protocolo_plaqueta, local, status, imagem, categoria FROM itens_cende"
     )
     itens = cursor.fetchall()
     conexao.close()
     return itens
 
 
-def inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status, imagem=None):
+def inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status, imagem=None, categoria=""):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
         cursor.execute(
             """
-            INSERT INTO itens_cende (nome, descricao, patrimonio_pertence, numero_protocolo_plaqueta, local, status, imagem)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO itens_cende (nome, descricao, patrimonio_pertence, numero_protocolo_plaqueta, local, status, imagem, categoria)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (nome, descricao, patrimonio, plaqueta, local, status, imagem),
+            (nome, descricao, patrimonio, plaqueta, local, status, imagem, categoria),
         )
         conexao.commit()
         return True, "Item cadastrado com sucesso!"
@@ -185,6 +191,7 @@ def atualizar_item_por_coluna(item_id: int, coluna: str, valor):
         "local": "local",
         "status": "status",
         "imagem": "imagem",
+        "categoria": "categoria",
     }
 
     if coluna not in colunas_permitidas:
@@ -204,17 +211,17 @@ def atualizar_item_por_coluna(item_id: int, coluna: str, valor):
         conexao.close()
 
 
-def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, imagem,protocolo, itens_armarios=None):
+def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, imagem, protocolo=None, itens_armarios=None, categoria=""):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
         cursor.execute(
             """
             UPDATE itens_cende
-            SET nome = ?, descricao = ?, patrimonio_pertence = ?, numero_protocolo_plaqueta = ?, local = ?, status = ?, imagem = COALESCE(?, imagem)
+            SET nome = ?, descricao = ?, patrimonio_pertence = ?, numero_protocolo_plaqueta = ?, local = ?, status = ?, imagem = COALESCE(?, imagem), categoria = ?
             WHERE id = ?
             """,
-            (nome, descricao, patrimonio, plaqueta, local, status, imagem, item_id),
+            (nome, descricao, patrimonio, plaqueta, local, status, imagem, categoria, item_id),
         )
 
         if itens_armarios is not None:
@@ -255,7 +262,7 @@ def listar_armarios_com_itens():
     cursor = conexao.cursor()
     cursor.execute(
         """
-        SELECT a.id, a.nome, ia.id, ia.nome_item, ia.imagem, ia.protocolo
+        SELECT a.id, a.nome, ia.id, ia.nome_item, ia.imagem, ia.protocolo, ia.categoria
         FROM armarios AS a
         LEFT JOIN itens_armario AS ia ON ia.armario_id = a.id
         ORDER BY a.id, ia.id
@@ -263,19 +270,19 @@ def listar_armarios_com_itens():
     )
 
     armarios = {}
-    for armario_id, nome, item_id, nome_item, imagem, protocolo in cursor.fetchall():
+    for armario_id, nome, item_id, nome_item, imagem, protocolo, categoria in cursor.fetchall():
         if armario_id not in armarios:
             armarios[armario_id] = {"id": armario_id, "nome": nome, "itens": []}
         if item_id is not None:
             armarios[armario_id]["itens"].append(
-                {"id": item_id, "nome": nome_item, "imagem": imagem, "protocolo": protocolo}
+                {"id": item_id, "nome": nome_item, "imagem": imagem, "protocolo": protocolo, "categoria": categoria}
             )
 
     conexao.close()
     return list(armarios.values())
 
 
-def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo: str = ""):
+def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo: str = "", categoria: str = ""):
     nome_item = (nome_item or "").strip()
     protocolo = (protocolo or "").strip()
     if not nome_item:
@@ -291,8 +298,8 @@ def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo
             return False, "Armário não encontrado."
 
         cursor.execute(
-            "INSERT INTO itens_armario (armario_id, nome_item, imagem, protocolo) VALUES (?, ?, ?, ?)",
-            (armario_id, nome_item, imagem, protocolo),
+            "INSERT INTO itens_armario (armario_id, nome_item, imagem, protocolo, categoria) VALUES (?, ?, ?, ?, ?)",
+            (armario_id, nome_item, imagem, protocolo, categoria),
         )
         conexao.commit()
         return True, "Item adicionado ao armário."
@@ -303,7 +310,7 @@ def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo
         conexao.close()
 
 
-def atualizar_item_armario(item_id: int, nome_item: str, protocolo: str, imagem=None):
+def atualizar_item_armario(item_id: int, nome_item: str, protocolo: str, imagem=None, categoria: str = ""):
     if not nome_item or not nome_item.strip():
         return False, "Nome do item é obrigatório."
     if not protocolo or not protocolo.strip():
@@ -313,8 +320,8 @@ def atualizar_item_armario(item_id: int, nome_item: str, protocolo: str, imagem=
     cursor = conexao.cursor()
     try:
         cursor.execute(
-            "UPDATE itens_armario SET nome_item = ?, protocolo = ?, imagem = COALESCE(?, imagem) WHERE id = ?",
-            (nome_item.strip(), protocolo.strip(), imagem, item_id),
+            "UPDATE itens_armario SET nome_item = ?, protocolo = ?, imagem = COALESCE(?, imagem), categoria = ? WHERE id = ?",
+            (nome_item.strip(), protocolo.strip(), imagem, categoria, item_id),
         )
         conexao.commit()
         return True, "Item atualizado com sucesso."
@@ -349,7 +356,7 @@ def pesquisar_item(termo):
     cursor.execute(
         """
          SELECT id, nome, descricao, patrimonio_pertence,
-                numero_protocolo_plaqueta, local, status, imagem
+              numero_protocolo_plaqueta, local, status, imagem, categoria
          FROM itens_cende
          WHERE TRIM(COALESCE(nome, '')) LIKE ?
             OR TRIM(COALESCE(descricao, '')) LIKE ?
@@ -358,8 +365,14 @@ def pesquisar_item(termo):
             OR TRIM(COALESCE(local, '')) LIKE ?
             OR TRIM(COALESCE(status, '')) LIKE ?
          ORDER BY nome COLLATE NOCASE
+
+         UNION ALL
+         SELECT id, nome, protocolo
+         FROM amarios
+         WHERE TRIM(COALESCE(nome, '')) LIKE ?
+         OR TRIM(COALESCE(protocolo, '')) LIKE ?
         """,
-        (padrao, padrao, padrao, padrao, padrao, padrao),
+        (padrao, padrao, padrao, padrao, padrao, padrao, padrao, padrao),
     )
     itens = cursor.fetchall()
     conexao.close()
@@ -400,6 +413,38 @@ def listar_itens_por_atributo(atributo, valor):
         ORDER BY nome COLLATE NOCASE
         """,
         (valor,),
+    )
+    itens = cursor.fetchall()
+    conexao.close()
+    return itens
+
+
+def pesquisar_itens_relatorio(termo):
+    termo = (termo or "").strip()
+    if not termo:
+        return []
+
+    conexao = sqlite3.connect("estoque.db")
+    cursor = conexao.cursor()
+    padrao = f"%{termo}%"
+    cursor.execute(
+        """
+         SELECT nome, descricao, categoria, patrimonio_pertence,
+             numero_protocolo_plaqueta, local, status, 'Estoque geral' AS origem
+        FROM itens_cende
+         WHERE nome LIKE ? COLLATE NOCASE OR descricao LIKE ? COLLATE NOCASE OR categoria LIKE ? COLLATE NOCASE
+
+        UNION ALL
+
+         SELECT ia.nome_item, '', ia.categoria, '', ia.protocolo,
+             a.nome, 'ARMÁRIO', 'Armário: ' || a.nome AS origem
+        FROM itens_armario AS ia
+        JOIN armarios AS a ON a.id = ia.armario_id
+          WHERE ia.nome_item LIKE ? COLLATE NOCASE OR ia.protocolo LIKE ? COLLATE NOCASE
+              OR ia.categoria LIKE ? COLLATE NOCASE OR a.nome LIKE ? COLLATE NOCASE
+          ORDER BY nome COLLATE NOCASE
+        """,
+          (padrao, padrao, padrao, padrao, padrao, padrao, padrao),
     )
     itens = cursor.fetchall()
     conexao.close()
