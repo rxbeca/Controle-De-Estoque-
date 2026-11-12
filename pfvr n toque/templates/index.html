@@ -5,24 +5,35 @@
     <title>Estoque do CENDE</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
+        /* Define o fundo e a organização do cabeçalho principal da página. */
         body { display: block; padding: 2rem; background: #fff; color: #333; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+
+        /* Padroniza a tabela de itens e diferencia cabeçalhos e ações de cadastro/edição. */
         table { width: 100%; border-collapse: collapse; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e7e7e7; }
         th { background: #2563eb; color: #fff; }
         .btn-danger { background: #d9534f; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .btn-primary { background: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+
+        /* Organiza o formulário de novo item em colunas e uniformiza seus campos. */
         .form-novo { background: #fff; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .form-novo form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: end; }
         .form-novo input, .form-novo select { width: 100%; min-width: 0; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+
+        /* Ajusta a apresentação das fotos atuais, dos campos de imagem e das mensagens sem foto. */
         .foto-field { display: flex; flex-direction: column; gap: 4px; color: #475569; font-size: 0.9rem; font-weight: bold; }
         .foto-field input { margin: 0; padding: 6px; background: #f8fafc; }
         .item-foto { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #dbe3ef; }
         .sem-foto { color: #94a3b8; font-size: 0.85rem; }
         .foto-editar { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
         .foto-editar input { max-width: 190px; font-size: 0.8rem; }
+
+        /* Mantém os campos de edição alinhados e agrupa os botões de cada item. */
         .form-editar input, .form-editar select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; }
         .acoes { display: flex; gap: 8px; align-items: center; }
+
+        /* Organiza visualmente os cartões de armário exibidos junto ao estoque. */
         .armarios-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin: 1rem 0 2rem; }
         .armario-card { background: #fff; padding: 1.25rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .armario-card h3 { margin-bottom: 1rem; color: #2563eb; }
@@ -31,11 +42,15 @@
         .armario-itens { padding-left: 1.25rem; margin: 0; }
         .armario-item { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
         .btn-small { background: #d9534f; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+
+        /* Reduz o número de colunas e habilita rolagem da tabela em telas menores. */
         @media (max-width: 900px) {
             body { padding: 1rem; }
             .form-novo form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             table { display: block; overflow-x: auto; white-space: nowrap; }
         }
+
+        /* Empilha os campos do cadastro para facilitar o uso em celulares estreitos. */
         @media (max-width: 560px) {
             .form-novo form { grid-template-columns: 1fr; }
             .form-novo button { width: 100%; }
@@ -52,12 +67,13 @@
         </div>
     </div>
 
+    <!-- Envia os dados e a foto opcional para cadastrar um item no estoque. -->
     <div class="form-novo">
         <h3><b>Cadastrar Novo Item</b></h3>
         <form action="{{ url_for('novo_item') }}" method="post" enctype="multipart/form-data" style="margin-top: 10px;">
             <input type="text" name="nome" placeholder="Nome do Item" required>
             <input type="text" name="descricao" placeholder="Descrição" required>
-            <input type="text" name="categoria" placeholder="Categoria (ex.: Móveis)">
+            <input type="text" name="categoria" placeholder="Categoria (ex.: Móveis)" required>
             <input type="text" name="patrimonio" placeholder="Patrimônio" required>
             <input type="text" name="plaqueta" placeholder="Nº Plaqueta" required>
             <input type="text" name="local" placeholder="Local" required>
@@ -75,6 +91,7 @@
         </form>
     </div>
 
+    <!-- Consulta o estoque com o termo informado; o X remove o filtro atual. -->
     <form action="{{ url_for('dashboard') }}" method="GET" style="margin-bottom: 20px;">
         <input
             type="text"
@@ -89,6 +106,7 @@
         {% endif %}
     </form>
 
+    <!-- Cada linha permite salvar alterações ou excluir o item correspondente. -->
     <h2>Itens da CENDE</h2>
     <table>
         <thead>
@@ -111,7 +129,7 @@
                     <input form="editar-item-{{ item[0] }}" type="text" name="nome" value="{{ item[1] }}" required>
                 </td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="descricao" value="{{ item[2] }}" required></td>
-                <td><input form="editar-item-{{ item[0] }}" type="text" name="categoria" value="{{ item[8] }}" placeholder="Categoria"></td>
+                <td><input form="editar-item-{{ item[0] }}" type="text" name="categoria" value="{{ item[8] }}" placeholder="Categoria" required></td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="patrimonio" value="{{ item[3] }}" required></td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="plaqueta" value="{{ item[4] }}" required></td>
                 <td><input form="editar-item-{{ item[0] }}" type="text" name="local" value="{{ item[5] }}" required></td>

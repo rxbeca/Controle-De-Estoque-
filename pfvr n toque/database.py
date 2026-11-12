@@ -1,8 +1,12 @@
+#EXTENSÕES DE BIBLBIOTECAS 
+
+
 import sqlite3
 import hashlib
 import os
 import binascii
 
+#ONDE SE CRIA O BANCO DE DADOS E AS TABELAS PRA O QUE CADA UM VAI RECEBER
 
 def criar_banco():
     conexao = sqlite3.connect("estoque.db")
@@ -19,7 +23,7 @@ def criar_banco():
             local TEXT NOT NULL,
             status TEXT CHECK(status IN ('DISPONIVEL', 'EM_USO', 'MANUTENCAO', 'INDISPONIVEL')) DEFAULT 'DISPONIVEL',
             imagem TEXT,
-            categoria TEXT DEFAULT ''
+            categoria TEXT NOT NULL DEFAULT ''
         )
         """
     )
@@ -27,18 +31,21 @@ def criar_banco():
     colunas_itens = {
         coluna[1] for coluna in cursor.execute("PRAGMA table_info(itens_cende)").fetchall()
     }
+    #ONDE AS IMAGENS SERAM ADCIONADAS 
+
     if "imagem" not in colunas_itens:
         cursor.execute("ALTER TABLE itens_cende ADD COLUMN imagem TEXT")
     if "categoria" not in colunas_itens:
-        cursor.execute("ALTER TABLE itens_cende ADD COLUMN categoria TEXT DEFAULT ''")
+        cursor.execute("ALTER TABLE itens_cende ADD COLUMN categoria TEXT NOT NULL DEFAULT ''")
 
+#A DOS ARMARIOS 
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS armarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT NOT NULL,
             imagem TEXT,
-            protocolo TEXT DEFAULT ''
+            patrimonio TEXT DEFAULT ''
         )
         """
     )
@@ -46,6 +53,8 @@ def criar_banco():
     colunas_armarios = {
         coluna[1] for coluna in cursor.execute("PRAGMA table_info(armarios)").fetchall()
     }
+    #MESMA COISA DAS IMAGENS DA OUTR TABELA
+     
     if "imagem" not in colunas_armarios:
         cursor.execute("ALTER TABLE armarios ADD COLUMN imagem TEXT")
     if "protocolo" not in colunas_armarios:
@@ -58,8 +67,8 @@ def criar_banco():
             armario_id INTEGER NOT NULL,
             nome_item TEXT NOT NULL,
             imagem TEXT,
-            protocolo INT DEFAULT 0,
-            categoria TEXT DEFAULT '',
+            patrimonio TEXT DEFAULT '',
+            categoria TEXT NOT NULL DEFAULT '',
             FOREIGN KEY (armario_id) REFERENCES armarios(id)
         )
         """
@@ -68,13 +77,24 @@ def criar_banco():
     colunas_itens_armario = {
         coluna[1] for coluna in cursor.execute("PRAGMA table_info(itens_armario)").fetchall()
     }
+    if "patrimonio" not in colunas_itens_armario:
+        cursor.execute("ALTER TABLE itens_armario ADD COLUMN patrimonio TEXT DEFAULT ''")
+        if "patrimonio_item" in colunas_itens_armario:
+            cursor.execute(
+                """
+                UPDATE itens_armario
+                SET patrimonio = patrimonio_item
+                WHERE patrimonio_item IS NOT NULL AND TRIM(patrimonio_item) <> ''
+                """
+            )
     if "imagem" not in colunas_itens_armario:
         cursor.execute("ALTER TABLE itens_armario ADD COLUMN imagem TEXT")
     if "protocolo" not in colunas_itens_armario:
         cursor.execute("ALTER TABLE itens_armario ADD COLUMN protocolo TEXT DEFAULT ''")
     if "categoria" not in colunas_itens_armario:
-        cursor.execute("ALTER TABLE itens_armario ADD COLUMN categoria TEXT DEFAULT ''")
+        cursor.execute("ALTER TABLE itens_armario ADD COLUMN categoria TEXT NOT NULL DEFAULT ''")
 
+# USUARIO(LOGIN)
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS usuarios (
@@ -85,7 +105,7 @@ def criar_banco():
         )
         """
     )
-
+#OS ARMARIOS ONDE CADA ITEM OIDE SER COLOCADO
     cursor.execute("SELECT COUNT(*) FROM armarios")
     if cursor.fetchone()[0] == 0:
         armarios_iniciais = [
@@ -101,13 +121,14 @@ def criar_banco():
     conexao.commit()
     conexao.close()
 
-
+# SENHA 
 def _hash_password(password: str, salt: bytes = None) -> str:
     if salt is None:
         salt = os.urandom(16)
     dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100_000)
     return binascii.hexlify(salt).decode() + ':' + binascii.hexlify(dk).decode()
 
+#VERIFICAÇÃO DE SENHA 
 
 def _verify_password(stored_hash: str, password: str) -> bool:
     try:
@@ -118,7 +139,7 @@ def _verify_password(stored_hash: str, password: str) -> bool:
     except Exception:
         return False
 
-
+# VERIFICA A VERACIDADE DA CONTA CADASTRADA 
 def verificar_credenciais(username: str, password: str) -> bool:
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
@@ -131,7 +152,7 @@ def verificar_credenciais(username: str, password: str) -> bool:
     finally:
         conexao.close()
 
-
+# CRIAR UM NOVO USUARIO 
 def criar_usuario(username: str, email: str, password: str):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
@@ -150,7 +171,7 @@ def criar_usuario(username: str, email: str, password: str):
     finally:
         conexao.close()
 
-
+#ONDE COMECA A LISTA  DA TABELA DE ITENS DO CENDE
 def listar_itens_cende():
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
@@ -161,8 +182,12 @@ def listar_itens_cende():
     conexao.close()
     return itens
 
-
+#ADICIONAR ITENS NA TABELA DO CENDE 
 def inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status, imagem=None, categoria=""):
+    categoria = (categoria or "").strip()
+    if not categoria:
+        return False, "Categoria é obrigatória."
+
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
@@ -181,7 +206,7 @@ def inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status, ima
     finally:
         conexao.close()
 
-
+#FAZ COM Q SEJA POSSIVEL ATUALIZAR UM ITEM POR COLUNA ESPECIFICA, COMO NOME, DESCRIÇÃO, PATRIMONIO, PLAQUETA, LOCAL, STATUS, IMAGEM OU CATEGORIA
 def atualizar_item_por_coluna(item_id: int, coluna: str, valor):
     colunas_permitidas = {
         "nome": "nome",
@@ -196,6 +221,10 @@ def atualizar_item_por_coluna(item_id: int, coluna: str, valor):
 
     if coluna not in colunas_permitidas:
         return False, "Coluna inválida."
+    if coluna == "categoria":
+        valor = str(valor or "").strip()
+        if not valor:
+            return False, "Categoria é obrigatória."
 
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
@@ -210,8 +239,12 @@ def atualizar_item_por_coluna(item_id: int, coluna: str, valor):
     finally:
         conexao.close()
 
-
+#EDITA OS ITENS PRESENTES NA TABELA 
 def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, imagem, protocolo=None, itens_armarios=None, categoria=""):
+    categoria = (categoria or "").strip()
+    if not categoria:
+        return False, "Categoria é obrigatória."
+
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
@@ -228,10 +261,10 @@ def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, statu
             cursor.execute(
                 """
                 UPDATE itens_armario
-                SET nome_item = ?, protocolo_item = ?, imagem = COALESCE(?, imagem)
+                SET nome_item = ?, patrimonio = ?, imagem = COALESCE(?, imagem)
                 WHERE id = ?
                 """,
-                (nome, protocolo, imagem, itens_armarios),
+                (nome, patrimonio, imagem, itens_armarios),
             )
 
         conexao.commit()
@@ -242,7 +275,7 @@ def edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, statu
     finally:
         conexao.close()
 
-
+#EXCLUIR ITENS
 def excluir_item_db(item_id: int):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
@@ -256,13 +289,13 @@ def excluir_item_db(item_id: int):
     finally:
         conexao.close()
 
-
+# AQ PARTE DA MESMA LOGICA DOS DEFS PARA OS ITENS DO CENDE, EH A MESMA LOGICA PARA OS ARMARIOS 
 def listar_armarios_com_itens():
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     cursor.execute(
         """
-        SELECT a.id, a.nome, ia.id, ia.nome_item, ia.imagem, ia.protocolo, ia.categoria
+        SELECT a.id, a.nome, ia.id, ia.nome_item, ia.imagem, ia.patrimonio, ia.categoria
         FROM armarios AS a
         LEFT JOIN itens_armario AS ia ON ia.armario_id = a.id
         ORDER BY a.id, ia.id
@@ -270,25 +303,28 @@ def listar_armarios_com_itens():
     )
 
     armarios = {}
-    for armario_id, nome, item_id, nome_item, imagem, protocolo, categoria in cursor.fetchall():
+    for armario_id, nome, item_id, nome_item, imagem, patrimonio, categoria in cursor.fetchall():
         if armario_id not in armarios:
             armarios[armario_id] = {"id": armario_id, "nome": nome, "itens": []}
         if item_id is not None:
             armarios[armario_id]["itens"].append(
-                {"id": item_id, "nome": nome_item, "imagem": imagem, "protocolo": protocolo, "categoria": categoria}
+                {"id": item_id, "nome": nome_item, "imagem": imagem, "patrimonio": patrimonio, "categoria": categoria}
             )
 
     conexao.close()
     return list(armarios.values())
 
-
-def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo: str = "", categoria: str = ""):
+# ANTES DE ADICIONAR UM ITEM AO ARMARIO, ELE VERIFICA SE O NOME, PATRIMONIO E CATEGORIA ESTÃO PRESENTES, SE NAO ESTIVEREM, ELE RETORNA UMA MENSAGEM DE ERRO
+def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, patrimonio: str = "", categoria: str = ""):
     nome_item = (nome_item or "").strip()
-    protocolo = (protocolo or "").strip()
+    patrimonio = (patrimonio or "").strip()
+    categoria = (categoria or "").strip()
     if not nome_item:
         return False, "Nome do item é obrigatório."
-    if not protocolo:
-        return False, "Protocolo é obrigatório."
+    if not patrimonio:
+        return False, "Patrimonio  é obrigatório."
+    if not categoria:
+        return False, "Categoria é obrigatória."
 
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
@@ -298,8 +334,8 @@ def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo
             return False, "Armário não encontrado."
 
         cursor.execute(
-            "INSERT INTO itens_armario (armario_id, nome_item, imagem, protocolo, categoria) VALUES (?, ?, ?, ?, ?)",
-            (armario_id, nome_item, imagem, protocolo, categoria),
+            "INSERT INTO itens_armario (armario_id, nome_item, imagem, patrimonio, categoria) VALUES (?, ?, ?, ?, ?)",
+            (armario_id, nome_item, imagem, patrimonio, categoria),
         )
         conexao.commit()
         return True, "Item adicionado ao armário."
@@ -310,18 +346,21 @@ def inserir_item_armario(armario_id: int, nome_item: str, imagem=None, protocolo
         conexao.close()
 
 
-def atualizar_item_armario(item_id: int, nome_item: str, protocolo: str, imagem=None, categoria: str = ""):
+def atualizar_item_armario(item_id: int, nome_item: str, patrimonio: str, imagem=None, categoria: str = ""):
+    categoria = (categoria or "").strip()
     if not nome_item or not nome_item.strip():
         return False, "Nome do item é obrigatório."
-    if not protocolo or not protocolo.strip():
-        return False, "Protocolo é obrigatório."
+    if not patrimonio or not patrimonio.strip():
+        return False, "Patrimonio  é obrigatório."
+    if not categoria:
+        return False, "Categoria é obrigatória."
 
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     try:
         cursor.execute(
-            "UPDATE itens_armario SET nome_item = ?, protocolo = ?, imagem = COALESCE(?, imagem), categoria = ? WHERE id = ?",
-            (nome_item.strip(), protocolo.strip(), imagem, categoria, item_id),
+            "UPDATE itens_armario SET nome_item = ?, patrimonio = ?, imagem = COALESCE(?, imagem), categoria = ? WHERE id = ?",
+            (nome_item.strip(), patrimonio.strip(), imagem, categoria, item_id),
         )
         conexao.commit()
         return True, "Item atualizado com sucesso."
@@ -344,7 +383,7 @@ def excluir_item_armario(item_id: int):
         return False, str(e)
     finally:
         conexao.close()
-
+# ONDE SE PESQUISA ITENS DA TABELA PRINCIPAL E DOS ARMARIOS 
 def pesquisar_item(termo):
     termo = (termo or '').strip()
     if not termo:
@@ -353,32 +392,27 @@ def pesquisar_item(termo):
     conexao = sqlite3.connect("estoque.db")
     cursor = conexao.cursor()
     padrao = f"%{termo}%"
-    cursor.execute(
-        """
-         SELECT id, nome, descricao, patrimonio_pertence,
-              numero_protocolo_plaqueta, local, status, imagem, categoria
-         FROM itens_cende
-         WHERE TRIM(COALESCE(nome, '')) LIKE ?
-            OR TRIM(COALESCE(descricao, '')) LIKE ?
-            OR TRIM(COALESCE(patrimonio_pertence, '')) LIKE ?
-            OR TRIM(COALESCE(numero_protocolo_plaqueta, '')) LIKE ?
-            OR TRIM(COALESCE(local, '')) LIKE ?
-            OR TRIM(COALESCE(status, '')) LIKE ?
-         ORDER BY nome COLLATE NOCASE
+    try:
+        cursor.execute(
+            """
+            SELECT id, nome, descricao, patrimonio_pertence,
+                   numero_protocolo_plaqueta, local, status, imagem, categoria
+            FROM itens_cende
+            WHERE TRIM(COALESCE(nome, '')) LIKE ?
+               OR TRIM(COALESCE(descricao, '')) LIKE ?
+               OR TRIM(COALESCE(patrimonio_pertence, '')) LIKE ?
+               OR TRIM(COALESCE(numero_protocolo_plaqueta, '')) LIKE ?
+               OR TRIM(COALESCE(local, '')) LIKE ?
+               OR TRIM(COALESCE(status, '')) LIKE ?
+            ORDER BY nome COLLATE NOCASE
+            """,
+            (padrao, padrao, padrao, padrao, padrao, padrao),
+        )
+        return cursor.fetchall()
+    finally:
+        conexao.close()
 
-         UNION ALL
-         SELECT id, nome, protocolo
-         FROM amarios
-         WHERE TRIM(COALESCE(nome, '')) LIKE ?
-         OR TRIM(COALESCE(protocolo, '')) LIKE ?
-        """,
-        (padrao, padrao, padrao, padrao, padrao, padrao, padrao, padrao),
-    )
-    itens = cursor.fetchall()
-    conexao.close()
-    return itens
-
-
+# ADIÇAO DE ATRIBUTOS PARA PESQUISA DE ITENS, COMO NOME, LOCAL E STATUS, PARA FACILITAR A BUSCA DE ITENS ESPECIFICOS
 def listar_valores_atributo(atributo):
     colunas_permitidas = {"nome": "Nome", "local": "Local", "status": "Status"}
     coluna = colunas_permitidas.get(atributo)
@@ -395,7 +429,7 @@ def listar_valores_atributo(atributo):
     conexao.close()
     return valores
 
-
+# ESSE EH PARA OS ARAMRIOS 
 def listar_itens_por_atributo(atributo, valor):
     colunas_permitidas = {"nome": "Nome", "local": "Local", "status": "Status"}
     coluna = colunas_permitidas.get(atributo)
@@ -418,7 +452,7 @@ def listar_itens_por_atributo(atributo, valor):
     conexao.close()
     return itens
 
-
+# A PARTE DE PESQUISA DE IRENS PARA A CRIAÇÃO DOS REALTORIOS 
 def pesquisar_itens_relatorio(termo):
     termo = (termo or "").strip()
     if not termo:
@@ -436,11 +470,11 @@ def pesquisar_itens_relatorio(termo):
 
         UNION ALL
 
-         SELECT ia.nome_item, '', ia.categoria, '', ia.protocolo,
+         SELECT ia.nome_item, '', ia.categoria, '', ia.patrimonio,
              a.nome, 'ARMÁRIO', 'Armário: ' || a.nome AS origem
         FROM itens_armario AS ia
         JOIN armarios AS a ON a.id = ia.armario_id
-          WHERE ia.nome_item LIKE ? COLLATE NOCASE OR ia.protocolo LIKE ? COLLATE NOCASE
+          WHERE ia.nome_item LIKE ? COLLATE NOCASE OR ia.patrimonio LIKE ? COLLATE NOCASE
               OR ia.categoria LIKE ? COLLATE NOCASE OR a.nome LIKE ? COLLATE NOCASE
           ORDER BY nome COLLATE NOCASE
         """,
@@ -449,4 +483,3 @@ def pesquisar_itens_relatorio(termo):
     itens = cursor.fetchall()
     conexao.close()
     return itens
-

@@ -1,10 +1,12 @@
+/* Reset geral e base do documento */
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
 }
 
+/* Estrutura central da página: fundo leve e alinhamento no centro da tela */
 body {
     background-color: #f4f6f9;
     height: 100vh;
@@ -13,12 +15,14 @@ body {
     justify-content: center;
 }
 
+/* Container principal que limita a largura da área de login */
 .login-wrapper {
     width: 100%;
     max-width: 960px;
     padding: 20px;
 }
 
+/* Cartão principal com os dois painéis do formulário */
 .login-card-modern {
     background: #ffffff;
     display: flex;
@@ -29,7 +33,7 @@ body {
     min-height: 480px;
 }
 
-/* Painel Esquerdo */
+/* Painel esquerdo: visual de destaque e branding da aplicação */
 .login-left-panel {
     background: #2563eb;
     color: #ffffff;
@@ -41,12 +45,14 @@ body {
     position: relative;
 }
 
+/* Título principal do painel esquerdo */
 .login-left-panel h1 {
     font-size: 2rem;
     font-weight: 700;
     margin-bottom: 12px;
 }
 
+/* Texto complementar do painel esquerdo */
 .panel-subtitle {
     font-size: 1rem;
     line-height: 1.5;
@@ -54,18 +60,20 @@ body {
     color: #eff6ff;
 }
 
+/* Descrição menor do painel lateral */
 .panel-desc {
     font-size: 0.875rem;
     line-height: 1.4;
     color: #dbeafe;
 }
 
+/* Ilustração visual do painel inicial */
 .panel-illustration {
     margin-top: 20px;
     max-height: 140px;
 }
 
-/* Painel Direito */
+/* Painel direito: área do formulário de acesso */
 .login-right-panel {
     flex: 1;
     padding: 40px;
@@ -74,6 +82,7 @@ body {
     justify-content: center;
 }
 
+/* Cabeçalho do formulário com título e mensagem de boas-vindas */
 .form-header h2 {
     font-size: 1.75rem;
     color: #333333;
@@ -81,6 +90,7 @@ body {
     margin-bottom: 30px;
 }
 
+/* Estilo das mensagens de erro exibidas em destaque */
 .alert-error {
     background-color: #fff1f0;
     color: #d9534f;
@@ -91,24 +101,28 @@ body {
     border-left: 4px solid #d9534f;
 }
 
+/* Agrupamento vertical dos campos do formulário */
 .login-form-modern {
     display: flex;
     flex-direction: column;
     gap: 20px;
 }
 
+/* Cada campo contém label e input organizados em coluna */
 .input-group-modern {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
+/* Rótulos dos campos */
 .input-group-modern label {
     font-size: 0.875rem;
     font-weight: 600;
     color: #64748b;
 }
 
+/* Campos de entrada do formulário */
 .input-group-modern input {
     width: 100%;
     padding: 12px 16px;
@@ -120,14 +134,17 @@ body {
     background-color: #ffffff;
 }
 
+/* Wrapper do campo de senha para reservar espaço ao botão de mostrar/ocultar */
 .password-input-wrapper {
     position: relative;
 }
 
+/* Ajusta o padding do input quando há o botão de visibilidade */
 .password-input-wrapper input {
     padding-right: 88px;
 }
 
+/* Botão de alternar visualização da senha dentro do campo */
 .toggle-password {
     position: absolute;
     top: 50%;
@@ -143,17 +160,20 @@ body {
     cursor: pointer;
 }
 
+/* Foco acessível para o botão de mostrar/ocultar senha */
 .toggle-password:focus-visible {
     outline: 2px solid #2563eb;
     outline-offset: 2px;
 }
 
+/* Feedback visual quando o campo recebe foco */
 .input-group-modern input:focus {
     border-color: #2563eb;
     background-color: #ffffff;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
+/* Botão principal de envio do formulário */
 .btn-submit-modern {
     margin-top: 10px;
     background: #2563eb;
@@ -168,15 +188,18 @@ body {
     box-shadow: 0 4px 8px rgba(37, 99, 235, 0.2);
 }
 
+/* Feedback visual ao passar o mouse sobre o botão principal */
 .btn-submit-modern:hover {
     opacity: 0.95;
     transform: translateY(-1px);
 }
 
+/* Efeito ao clicar no botão principal */
 .btn-submit-modern:active {
     transform: translateY(0);
 }
 
+/* Link auxiliar para ações secundárias dentro do formulário */
 .btn-link {
     background: none;
     border: none;
@@ -187,18 +210,21 @@ body {
     font-weight: 600;
 }
 
+/* Destaque visual para link auxiliar ao passar o mouse */
 .btn-link:hover {
     text-decoration: underline;
 }
 
-
+/* Ajustes responsivos para telas menores */
 @media (max-width: 768px) {
     .login-card-modern {
         flex-direction: column;
     }
+
     .login-left-panel {
         padding: 30px;
     }
+
     .panel-illustration {
         display: none;
     }

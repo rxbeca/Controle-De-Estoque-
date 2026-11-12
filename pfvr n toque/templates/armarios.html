@@ -4,24 +4,35 @@
     <meta charset="UTF-8">
     <title>Armários - Estoque do CENDE</title>
     <style>
+        /* Faz dimensões de borda e espaçamento entrarem no cálculo do tamanho dos elementos. */
         * { box-sizing: border-box; }
+
+        /* Define a tipografia, o fundo e o espaçamento base da página. */
         body { margin: 0; padding: 2rem; background: #f4f6f9; color: #333; font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif; }
         h1 { font-size: clamp(1.5rem, 3vw, 2.2rem); }
+
+        /* Alinha o título e os links de navegação no topo. */
         .header-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 2rem; }
         .header-links { display: flex; gap: 1rem; }
         .header-links a { font-weight: bold; text-decoration: none; }
         .dashboard-link { color: #2563eb; }
         .logout-link { color: #d9534f; }
+
+        /* Exibe cada armário em um cartão e organiza seus campos de inclusão de itens. */
         .armarios-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
         .armario-card { background: #fff; padding: 0.8rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .armario-card h2 { margin-top: 0; margin-bottom: 0.6rem; color: #2563eb; }
         .armario-form { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.6rem; align-items: end; }
         .armario-form input { flex: 150px; min-width: 0; padding: 6px 7px; border: 1px solid #ccc; border-radius: 4px; }
         .armario-form button { flex-shrink: 0; padding: 6px 10px; }
+
+        /* Mantém os controles de foto compactos e as miniaturas uniformes. */
         .foto-field { display: flex; flex-direction: column; gap: 2px; color: #475569; font-size: 0.62rem; font-weight: bold; flex: 1 1 180px; min-width: 0; }
         .foto-field input { width: 100%; min-width: 0; padding: 2px 4px; background: #f8fafc; font-size: 0.68rem; height: 10px; }
         .item-foto { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid #dbe3ef; vertical-align: middle; }
         .sem-foto { color: #94a3b8; font-size: 0.85rem; }
+
+        /* Diferencia botões de adicionar e excluir, e mantém a tabela legível com rolagem. */
         .btn-primary, .btn-danger { border: none; color: white; padding: 7px 10px; border-radius: 4px; cursor: pointer; }
         .btn-primary { background: #2563eb; }
         .btn-danger { background: #d9534f; padding: 4px 8px; }
@@ -35,6 +46,8 @@
         .foto-editar input { width: 100%; min-width: 0; font-size: 0.8rem; }
         .acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .vazio { color: #666; }
+
+        /* Empilha navegação e formulário em telas estreitas para evitar campos apertados. */
         @media (max-width: 600px) {
             body { padding: 1rem; }
             .header-bar { align-items: flex-start; flex-direction: column; }
@@ -52,6 +65,7 @@
         </div>
     </div>
     <div style="margin-bottom: 20px;">
+        <!-- Atualiza a lista de armários e itens enquanto o usuário digita. -->
         <input type="text" id="inputPesquisaGeral" onkeyup="filtrarGeral()" placeholder="Pesquisar item..." style="width:100%; padding: 10px; font-size: 16px;"/>
     </div>
 
@@ -59,11 +73,11 @@
         {% for armario in armarios %}
         <section class="armario-card">
             <h2>{{ armario.nome }}</h2>
-
+            <!-- CADASTRAR NOVO ITEM DENTRO DOS ARMARIOS -->
             <form class="armario-form" action="{{ url_for('novo_item_armario', armario_id=armario.id) }}" method="post" enctype="multipart/form-data">
                 <input type="text" name="nome_item" placeholder="Nome do item" required>
-                <input type="text" name="categoria" placeholder="Categoria (ex.: Móveis)">
-                 <input type="string" name="protocolo" placeholder="Digite o protocolo" required>
+                <input type="text" name="categoria" placeholder="Categoria (ex.: Móveis)" required>
+                 <input type="text" name="patrimonio" placeholder="Digite o patrimônio" required>
                    Foto (opcional)
                     <input type="file" name="imagem" accept=".jpg,.jpeg,.png,.webp,.gif">
                 <button type="submit" class="btn-primary">Adicionar</button>
@@ -90,7 +104,7 @@
                     <tr>
                         <th>Nome</th>
                         <th>Categoria</th>
-                        <th>Protocolo</th>
+                        <th>Patrimônio</th>
                         <th>Foto</th>
                         <th>Ações</th>
                     </tr>
@@ -102,10 +116,10 @@
                         <input form="editar-item-{{ item_armario.id }}" type="text" name="nome_item" value="{{ item_armario.nome }}" required>
                     </td>
                     <td>
-                        <input form="editar-item-{{ item_armario.id }}" type="text" name="categoria" value="{{ item_armario.categoria }}" placeholder="Categoria">
+                        <input form="editar-item-{{ item_armario.id }}" type="text" name="categoria" value="{{ item_armario.categoria }}" placeholder="Categoria" required>
                     </td>
                     <td>
-                        <input form="editar-item-{{ item_armario.id }}" type="text" name="protocolo_item" value="{{ item_armario.protocolo }}" required>
+                        <input form="editar-item-{{ item_armario.id }}" type="text" name="patrimonio_item" value="{{ item_armario.patrimonio }}" required>
                     </td>
                     <td>
                         {% if item_armario.imagem %}
@@ -137,6 +151,7 @@
     </div>
 
     <script>
+        // Filtra itens pelos campos da tabela e mantém visíveis apenas os armários com correspondências.
         function filtrarGeral() {
             const filtro = document.getElementById("inputPesquisaGeral").value.trim().toLowerCase();
             const armarios = document.querySelectorAll(".armario-card");

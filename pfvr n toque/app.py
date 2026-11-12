@@ -1,3 +1,6 @@
+# EXTENSOES E BIBLIOTECAS USADAS NO PROJETO
+
+
 import os
 from werkzeug.utils import secure_filename
 import sqlite3
@@ -18,6 +21,9 @@ from database import (
     pesquisar_item,
     pesquisar_itens_relatorio,
 )
+
+#ESSA EH O ARQUIVO NA QUAL O SITE IRAR RODAR A PARTE DO FUNCIONAMENTO LÓGICO POR TRAS DOS DEFS SAO FEITS NO DATABASE.PY ONDE TODOS OS DADOS SERAM COLETADOS!
+
 #onde eu vou colocar as imagens 
 app = Flask(__name__)
 app.secret_key = 'chave_secreta_super_segura_cende'
@@ -28,16 +34,16 @@ ALLOWED_EXTENSIONS = {'png', 'jpeg', 'webp', 'jpg', 'gif'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
+# BANCO DE DADOS A QUAL TA CONECTADO 
 def get_db_connection():
     conn = sqlite3.connect('estoque.db')
     conn.row_factory = sqlite3.Row
     return conn
-
+#ONDE INCIA O BANCO DE DADOS 
 criar_banco()
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
+# ROTA DE LOGIN E CADASTRO 
 @app.route('/')
 def login_page():
     if 'usuario' in session:
@@ -81,7 +87,7 @@ def logout():
     session.pop('usuario', None)
     return redirect(url_for('login_page'))
 
-
+#PESQUISA DE ITENS
 @app.route('/dashboard')
 def dashboard():
     if 'usuario' not in session:
@@ -98,7 +104,7 @@ def dashboard():
         busca=busca,
     )
 
-
+#ARMARIOS 
 @app.route('/armarios')
 def armarios_page():
     if 'usuario' not in session:
@@ -107,7 +113,7 @@ def armarios_page():
     armarios = listar_armarios_com_itens()
     return render_template('armarios.html', armarios=armarios, usuario=session['usuario'])
 
-
+#RELATORIOS (A MAIORIA DOS DEF SAO AUTOEXPLICATIVOS ENTAO N EH TAO DIFICIL DE ENCONTRAR OS COMANDOS CERTOS)
 @app.route('/relatorio')
 def relatorio():
     if 'usuario' not in session:
@@ -122,7 +128,7 @@ def relatorio():
         usuario=session['usuario'],
     )
 
-
+# CADASTRO DE NOVO ITEM 
 @app.route('/item/novo', methods=['POST'])
 def novo_item():
     if 'usuario' not in session:
@@ -135,6 +141,8 @@ def novo_item():
     local = request.form.get('local')
     status = request.form.get('status')
     categoria = request.form.get('categoria', '').strip()
+    if not categoria:
+        return 'Categoria é obrigatória.', 400
 
     imagem = request.files.get('imagem')
     nome_imagem = None
@@ -145,7 +153,7 @@ def novo_item():
     inserir_item_cende(nome, descricao, patrimonio, plaqueta, local, status, nome_imagem, categoria)
     return redirect(url_for('dashboard'))
 
-
+#EXCLUIR ITENS
 @app.route('/item/excluir/<int:item_id>', methods=['POST'])
 def excluir_item(item_id):
     if 'usuario' not in session:
@@ -154,7 +162,7 @@ def excluir_item(item_id):
     excluir_item_db(item_id)
     return redirect(url_for('dashboard'))
 
-
+#EDÇÃO DOS ITENS 
 @app.route('/item/editar/<int:item_id>', methods=['POST'])
 def editar_item(item_id):
     if 'usuario' not in session:
@@ -167,6 +175,8 @@ def editar_item(item_id):
     local = request.form.get('local')
     status = request.form.get('status')
     categoria = request.form.get('categoria', '').strip()
+    if not categoria:
+        return 'Categoria é obrigatória.', 400
     imagem = request.files.get('imagem')
 
     nome_imagem = None
@@ -176,7 +186,6 @@ def editar_item(item_id):
 
     edicao_de_itens(item_id, nome, descricao, patrimonio, plaqueta, local, status, nome_imagem, categoria=categoria)
     return redirect(url_for('dashboard'))
-
 
 @app.route('/api/item/atualizar', methods=['POST'])
 def atualizar_item_api():
@@ -190,12 +199,15 @@ def atualizar_item_api():
 
     if item_id is None or coluna is None or valor is None:
         return jsonify({'sucesso': False, 'mensagem': 'Dados incompletos.'}), 400
+    if coluna == 'categoria' and not str(valor).strip():
+        return jsonify({'sucesso': False, 'mensagem': 'Categoria é obrigatória.'}), 400
 
     sucesso, mensagem = atualizar_item_por_coluna(int(item_id), coluna, valor)
     if sucesso:
         return jsonify({'sucesso': True, 'mensagem': mensagem})
     return jsonify({'sucesso': False, 'mensagem': mensagem}), 400
 
+#CADASTRO DE ITEM NOS ARMARIOS(COMO SAO PAGINAS DIFERENTES E LUGARES DIFERRENTES, ELES FORAM DIVIDIDOS ASSIM PARA SER MAIS FACIL DE SE LOCALIZAR)
 
 @app.route('/armario/<int:armario_id>/item/novo', methods=['POST'])
 def novo_item_armario(armario_id):
@@ -203,17 +215,22 @@ def novo_item_armario(armario_id):
         return redirect(url_for('login_page'))
 
     nome_item = request.form.get('nome_item', '').strip()
-    protocolo = request.form.get('protocolo', '').strip()
+    patrimonio = request.form.get('patrimonio', '').strip()
     categoria = request.form.get('categoria', '').strip()
+    if not categoria:
+        return 'Categoria é obrigatória.', 400
+
     arquivo = request.files.get('imagem')
     nome_imagem = None
     if arquivo and arquivo.filename and allowed_file(arquivo.filename):
         nome_imagem = secure_filename(arquivo.filename)
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
 
-    if nome_item and protocolo:
-        inserir_item_armario(armario_id, nome_item, nome_imagem, protocolo, categoria)
+    if nome_item and patrimonio:
+        inserir_item_armario(armario_id, nome_item, nome_imagem, patrimonio, categoria)
     return redirect(url_for('armarios_page'))
+
+#EDITAR DENTRO DOS ARMARIOS (MESMO LÓGICA DO DE CIMA RAPAZIADA )
 
 
 @app.route('/armario/item/editar/<int:item_id>', methods=['POST'])
@@ -222,19 +239,22 @@ def editar_item_armario_rota(item_id):
         return redirect(url_for('login_page'))
 
     nome_item = request.form.get('nome_item', '').strip()
-    protocolo_item = request.form.get('protocolo_item', '').strip()
+    patrimonio_item = request.form.get('patrimonio_item', '').strip()
     categoria = request.form.get('categoria', '').strip()
+    if not categoria:
+        return 'Categoria é obrigatória.', 400
     arquivo = request.files.get('imagem')
     nome_imagem = None
     if arquivo and arquivo.filename and allowed_file(arquivo.filename):
         nome_imagem = secure_filename(arquivo.filename)
         arquivo.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_imagem))
 
-    sucesso, mensagem = atualizar_item_armario(item_id, nome_item, protocolo_item, nome_imagem, categoria)
+    sucesso, mensagem = atualizar_item_armario(item_id, nome_item, patrimonio_item, nome_imagem, categoria)
     if not sucesso:
         return redirect(url_for('armarios_page'))
     return redirect(url_for('armarios_page'))
 
+#EXCLUIR ITENS DOS ARMARIOS
 
 @app.route('/armario/item/excluir/<int:item_id>', methods=['POST'])
 def excluir_item_armario_rota(item_id):

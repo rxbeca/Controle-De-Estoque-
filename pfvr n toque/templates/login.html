@@ -1,3 +1,8 @@
+
+<!-- A PARTE DE ESTETICA DO LOGIN ESTA NA style.css, O CSS DESSA PAG ESTA EM UM ARQUIVO DIFERENTE!!!!!!!!!!!!!!!!!!!!!!!!!-->
+
+
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -15,6 +20,7 @@
                     <p class="panel-subtitle">Olá caro colaborador, seja bem-vindo novamente!</p>
                     <p class="panel-desc">Caso ainda não tenha um login, contate seu supervisor para criá-lo.</p>
                 </div>
+                <!-- CADASTRO DE NOVO USUARIO-->
                 <div class="panel-illustration">
                     <svg viewBox="0 0 400 180" width="100%" height="100%" preserveAspectRatio="xMidYMax meet">
                         <path d="M20,120 L100,120 L100,170 L20,170 Z" fill="#1e1b4b" opacity="0.2"/>
@@ -92,12 +98,14 @@
                 </form>
 
                 <script>
+                    // Alterna a exibição do formulário de criação de conta.
                     document.getElementById('toggle-register').addEventListener('click', function(e){
                         e.preventDefault();
                         var f = document.getElementById('register-form');
                         f.style.display = (f.style.display === 'none' || f.style.display === '') ? 'block' : 'none';
                     });
 
+                    // Mostra ou oculta a senha associada a cada botão.
                     document.querySelectorAll('.toggle-password').forEach(function(button){
                         button.addEventListener('click', function(){
                             var password = document.getElementById(button.getAttribute('aria-controls'));
